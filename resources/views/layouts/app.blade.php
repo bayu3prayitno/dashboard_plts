@@ -88,17 +88,20 @@
             @endforeach
 
             <div class="mt-auto flex w-full flex-col gap-1.5 lg:sb-collapsed:items-center">
+                <span class="mx-2 my-2 h-px shrink-0 bg-white/15 lg:sb-collapsed:mx-0 lg:sb-collapsed:w-7"></span>
+
                 <a href="{{ route('historical.exportCsv') }}" aria-label="Unduh CSV 24 jam" class="group nav-item">
                     <x-icon name="download" :size="19" />
                     <span class="nav-label">Unduh CSV 24 jam</span>
                     <span class="nav-hint">Unduh CSV 24 jam</span>
                 </a>
+
                 <a href="{{ route('profile.show') }}" aria-label="Profil {{ $layoutUser['nama'] }}"
-                   class="group relative mt-2 flex items-center gap-3 rounded-2xl px-1 transition-colors hover:bg-white/10 lg:sb-collapsed:px-0 {{ Route::is('profile.*') ? 'bg-white/15' : '' }}">
-                    <span class="grid size-11 shrink-0 place-items-center rounded-2xl bg-lime text-sm font-bold text-ink">{{ $initials }}</span>
-                    <span class="nav-label">
-                        <span class="block text-sm leading-tight font-semibold">{{ $layoutUser['nama'] }}</span>
-                        <span class="block text-xs text-white/60">{{ $layoutUser['role'] }}</span>
+                   class="group nav-item mt-1 {{ Route::is('profile.*') ? 'nav-item-active' : '' }}">
+                    <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-lime text-xs font-bold text-ink">{{ $initials }}</span>
+                    <span class="nav-label leading-tight">
+                        <span class="block truncate text-sm font-semibold">{{ $layoutUser['nama'] }}</span>
+                        <span class="block truncate text-xs text-white/60">{{ $layoutUser['role'] }}</span>
                     </span>
                     <span class="nav-hint">{{ $layoutUser['nama'] }} · {{ $layoutUser['role'] }}</span>
                 </a>
@@ -111,8 +114,8 @@
         {{-- Header transparan; di Dashboard ia menumpang di atas banner hero --}}
         <header class="relative z-20 flex h-16 items-center gap-3 px-1 sm:px-4">
             <button type="button" data-sidebar-toggle aria-label="Buka menu"
-                class="grid size-10 shrink-0 place-items-center rounded-full bg-white shadow-sm lg:hidden">
-                <x-icon name="menu" :size="18" />
+                class="grid size-10 shrink-0 place-items-center rounded-full bg-white text-lime-dark shadow-sm lg:hidden">
+                <x-logo :size="22" />
             </button>
             <p class="hidden items-center gap-2 text-sm text-muted sm:flex">
                 <x-icon name="layout-grid" :size="15" /> {{ $pageName }}
