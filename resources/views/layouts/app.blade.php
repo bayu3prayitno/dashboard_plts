@@ -58,7 +58,7 @@
             <button type="button" data-sidebar-toggle aria-label="OmahIoT, buka/tutup sidebar"
                 class="group relative mb-5 flex w-full items-center gap-3 rounded-2xl px-1 text-left lg:sb-collapsed:w-auto lg:sb-collapsed:px-0">
                 <span class="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary-dark text-lime transition-colors group-hover:bg-black">
-                    <x-icon name="sun" :size="22" />
+                    <x-logo :size="30" />
                 </span>
                 <span class="nav-label text-lg font-semibold">OmahIoT</span>
                 <span class="nav-hint">Buka sidebar</span>
@@ -93,22 +93,6 @@
                     <span class="nav-label">Unduh CSV 24 jam</span>
                     <span class="nav-hint">Unduh CSV 24 jam</span>
                 </a>
-                @auth
-                    <form method="POST" action="{{ route('logout') }}" class="contents">
-                        @csrf
-                        <button type="submit" aria-label="Logout" class="group nav-item">
-                            <x-icon name="log-out" :size="19" />
-                            <span class="nav-label">Logout</span>
-                            <span class="nav-hint">Logout</span>
-                        </button>
-                    </form>
-                @else
-                    <a href="{{ route('login') }}" aria-label="Masuk" class="group nav-item">
-                        <x-icon name="log-out" :size="19" class="rotate-180" />
-                        <span class="nav-label">Masuk</span>
-                        <span class="nav-hint">Masuk</span>
-                    </a>
-                @endauth
                 <a href="{{ route('profile.show') }}" aria-label="Profil {{ $layoutUser['nama'] }}"
                    class="group relative mt-2 flex items-center gap-3 rounded-2xl px-1 transition-colors hover:bg-white/10 lg:sb-collapsed:px-0 {{ Route::is('profile.*') ? 'bg-white/15' : '' }}">
                     <span class="grid size-11 shrink-0 place-items-center rounded-2xl bg-lime text-sm font-bold text-ink">{{ $initials }}</span>
