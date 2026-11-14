@@ -6,6 +6,7 @@ use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\AlertController;
 use App\Http\Controllers\HistoricalDataController;
 use App\Http\Controllers\GatewayController;
+use App\Http\Controllers\Api\GatewayApiController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Auth\LoginController;
@@ -68,6 +69,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/{gateway}/edit', [GatewayController::class, 'edit'])->name('edit');
         Route::put('/{gateway}', [GatewayController::class, 'update'])->name('update');
         Route::delete('/{gateway}', [GatewayController::class, 'delete'])->name('delete');
+    });
+
+    // API JSON gateway (login berbasis sesi; belum untuk perangkat eksternal)
+    Route::prefix('api/gateways')->name('api.gateways.')->group(function () {
+        Route::get('/', [GatewayApiController::class, 'index'])->name('index');
+        Route::post('/', [GatewayApiController::class, 'store'])->name('store');
+        Route::get('/{gateway}', [GatewayApiController::class, 'show'])->name('show');
+        Route::put('/{gateway}', [GatewayApiController::class, 'update'])->name('update');
+        Route::delete('/{gateway}', [GatewayApiController::class, 'destroy'])->name('destroy');
     });
 
     // Settings
