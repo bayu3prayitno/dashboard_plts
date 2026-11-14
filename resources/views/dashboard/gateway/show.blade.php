@@ -2,48 +2,46 @@
 
 @use('App\Support\Format')
 
-@section('title', $gateway['nama'].' - OmahIoT')
-
-@php
-    $tiles = [
-        ['icon' => 'router', 'label' => 'Gateway', 'status' => $gateway['status'], 'note' => $gateway['nama']],
-        ['icon' => 'server', 'label' => 'MQTT', 'status' => $gateway['mqtt_status'], 'note' => $gateway['broker']],
-        ['icon' => 'globe', 'label' => 'Internet', 'status' => $gateway['internet_status'], 'note' => 'Koneksi gateway ke jaringan luar'],
-    ];
-    $identity = [
-        ['Nama', $gateway['nama']],
-        ['Lokasi', $gateway['lokasi']],
-        ['Interval beacon', $gateway['beacon_menit'].' menit'],
-        ['Topic MQTT', $gateway['topic']],
-        ['Halaman web lokal', 'http://'.$gateway['ip_lokal']],
-    ];
-@endphp
+@section('title', $gateway->name.' - OmahIoT')
 
 @section('content')
     {{-- Judul halaman --}}
     <div class="mb-5 flex flex-wrap items-end justify-between gap-3 px-1">
         <div>
-            <h1 class="text-2xl font-semibold sm:text-3xl">Gateway</h1>
+            <h1 class="text-2xl font-semibold sm:text-3xl">{{ $gateway->name }}</h1>
             <p class="mt-1 text-sm text-muted">Status penerima LoRa, koneksi MQTT, dan internet.</p>
         </div>
-        <button type="button" data-modal-open="gateway-form" class="btn btn-outline bg-white">
-            <x-icon name="pencil" :size="15" /> Ubah identitas
-        </button>
+        <div class="flex gap-2">
+            <a href="{{ route('gateway.edit', $gateway) }}" class="btn btn-outline bg-white">
+                <x-icon name="pencil" :size="15" /> Ubah identitas
+            </a>
+            <button type="button" onclick="deleteGateway()" class="btn btn-outline bg-white text-red-600">Hapus</button>
+        </div>
     </div>
 
     {{-- Status --}}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        @foreach ($tiles as $t)
-            <section class="card">
-                <div class="flex items-center gap-2 text-sm text-muted"><x-icon :name="$t['icon']" :size="16" /> {{ $t['label'] }}</div>
-                <div class="mt-3"><x-status-badge :status="$t['status']" /></div>
-                <p class="mt-2 text-xs break-all text-muted">{{ $t['note'] }}</p>
-            </section>
-        @endforeach
+        <section class="card">
+            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="router" :size="16" /> Gateway</div>
+            <div class="mt-3"><x-status-badge :status="$gateway->status" /></div>
+            <p class="mt-2 text-xs break-all text-muted">{{ $gateway->gateway_code }}</p>
+        </section>
+        <section class="card">
+            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="server" :size="16" /> MQTT</div>
+            <div class="mt-3"><x-status-badge :status="$gateway->mqtt_status" /></div>
+            <p class="mt-2 text-xs text-muted">Broker MQTT</p>
+        </section>
+        <section class="card">
+            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="globe" :size="16" /> Internet</div>
+            <div class="mt-3"><x-status-badge :status="$gateway->internet_status" /></div>
+            <p class="mt-2 text-xs text-muted">Koneksi gateway ke jaringan luar</p>
+        </section>
         <section class="card">
             <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="clock" :size="16" /> Komunikasi terakhir</div>
-            <p class="mt-3 text-xl font-semibold">{{ Format::relTime($gateway['last_seen']) }}</p>
-            <p class="mt-2 text-xs text-muted">{{ $gateway['last_seen']->translatedFormat('d M Y, H:i') }} WIB</p>
+            <p class="mt-3 text-xl font-semibold">{{ Format::relTime($gateway->last_seen_at) }}</p>
+            @if($gateway->last_seen_at)
+                <p class="mt-2 text-xs text-muted">{{ $gateway->last_seen_at->translatedFormat('d M Y, H:i') }} WIB</p>
+            @endif
         </section>
     </div>
 
@@ -54,17 +52,19 @@
                 <h2 class="text-base font-semibold">Identitas</h2>
             </div>
             <dl class="space-y-3 text-sm">
-                @foreach ($identity as [$label, $value])
-                    <div class="flex justify-between gap-4">
-                        <dt class="shrink-0 text-muted">{{ $label }}</dt>
-                        <dd class="text-right font-medium break-all">{{ $value }}</dd>
-                    </div>
-                @endforeach
+                <div class="flex justify-between gap-4">
+                    <dt class="shrink-0 text-muted">Nama</dt>
+                    <dd class="text-right font-medium break-all">{{ $gateway->name }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="shrink-0 text-muted">Kode Gateway</dt>
+                    <dd class="text-right font-medium break-all">{{ $gateway->gateway_code }}</dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="shrink-0 text-muted">Lokasi</dt>
+                    <dd class="text-right font-medium break-all">{{ $gateway->location }}</dd>
+                </div>
             </dl>
-            <p class="mt-4 rounded-2xl bg-canvas p-3 text-xs text-muted">
-                Gateway juga menyimpan data ke CSV di kartu SD. Jika koneksi ke website terputus, data dapat
-                diunduh dari halaman web lokal gateway di jaringan yang sama.
-            </p>
         </section>
 
         {{-- Node terhubung --}}
@@ -76,68 +76,47 @@
                 <table class="w-full min-w-[560px] text-left text-sm">
                     <thead>
                         <tr class="border-b border-line text-xs text-muted">
-                            @foreach (['Node', 'Status', 'RSSI', 'SNR', 'Packet loss', 'Paket terakhir'] as $h)
+                            @foreach (['Node', 'Status', 'RSSI', 'SNR', 'Packet loss', 'Data terakhir'] as $h)
                                 <th class="px-3 py-2.5 font-medium whitespace-nowrap">{{ $h }}</th>
                             @endforeach
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-line">
-                        @foreach ($devices as $d)
+                        @forelse ($devices as $item)
+                            @php($d = $item['device'])
+                            @php($latest = $item['latest'])
                             <tr>
-                                <td class="px-3 py-3 align-middle"><a href="{{ route('devices.show', $d['id']) }}" class="font-medium hover:text-primary hover:underline">{{ $d['nama'] }}</a></td>
-                                <td class="px-3 py-3 align-middle"><x-status-badge :status="$d['status']" /></td>
-                                <td class="px-3 py-3 align-middle tabular-nums">{{ $d['rssi'] }} dBm</td>
-                                <td class="px-3 py-3 align-middle tabular-nums">{{ Format::num($d['snr'], 1) }} dB</td>
-                                <td class="px-3 py-3 align-middle tabular-nums">{{ Format::num($d['packet_loss'], 1) }} %</td>
-                                <td class="px-3 py-3 align-middle text-xs whitespace-nowrap text-muted">{{ Format::relTime($d['last_seen']) }}</td>
+                                <td class="px-3 py-3 align-middle"><a href="{{ route('devices.show', $d) }}" class="font-medium hover:text-primary hover:underline">{{ $d->name }}</a></td>
+                                <td class="px-3 py-3 align-middle"><x-status-badge :status="$d->status()" /></td>
+                                <td class="px-3 py-3 align-middle tabular-nums">{{ $latest?->rssi !== null ? $latest->rssi.' dBm' : '—' }}</td>
+                                <td class="px-3 py-3 align-middle tabular-nums">{{ $latest ? Format::num((float) $latest->snr, 1).' dB' : '—' }}</td>
+                                <td class="px-3 py-3 align-middle tabular-nums">{{ $latest ? Format::num((float) $latest->packet_loss, 1).' %' : '—' }}</td>
+                                <td class="px-3 py-3 align-middle text-xs whitespace-nowrap text-muted">{{ Format::relTime($d->last_seen_at) }}</td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="6" class="px-3 py-4 text-center text-sm text-muted">Belum ada node yang terhubung ke gateway ini.</td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
         </section>
     </div>
-
-    {{-- Modal ubah identitas --}}
-    <div id="gateway-form" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4" data-modal>
-        <div role="dialog" aria-modal="true" aria-labelledby="gateway-form-title" class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6">
-            <div class="mb-5 flex items-center justify-between">
-                <h2 id="gateway-form-title" class="text-lg font-semibold">Ubah Gateway</h2>
-                <button type="button" data-modal-close aria-label="Tutup" class="rounded-full p-1.5 text-muted hover:bg-canvas">
-                    <x-icon name="x" :size="18" />
-                </button>
-            </div>
-            {{-- TODO: arahkan ke route update gateway saat backend tersedia --}}
-            <form class="space-y-4" onsubmit="event.preventDefault(); alert('Penyimpanan identitas gateway akan aktif setelah backend tersedia.');">
-                <label class="block text-sm">
-                    <span class="mb-1.5 block font-medium">Nama gateway</span>
-                    <input name="nama" value="{{ $gateway['nama'] }}" required
-                        class="w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
-                </label>
-                <label class="block text-sm">
-                    <span class="mb-1.5 block font-medium">Lokasi</span>
-                    <input name="lokasi" value="{{ $gateway['lokasi'] }}" required
-                        class="w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
-                </label>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" data-modal-close class="btn text-muted hover:bg-canvas hover:text-ink">Batal</button>
-                    <button type="submit" class="btn btn-primary">Simpan</button>
-                </div>
-            </form>
-        </div>
-    </div>
 @endsection
 
 @push('scripts')
 <script>
-(function () {
-    const modal = document.getElementById('gateway-form');
-    const open = () => { modal.classList.remove('hidden'); modal.classList.add('flex'); modal.querySelector('input')?.focus(); };
-    const close = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
-    document.querySelector('[data-modal-open="gateway-form"]').addEventListener('click', open);
-    modal.querySelectorAll('[data-modal-close]').forEach((b) => b.addEventListener('click', close));
-    modal.addEventListener('mousedown', (e) => { if (e.target === modal) close(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-})();
+async function deleteGateway() {
+    if (!confirm('Apakah Anda yakin ingin menghapus gateway ini?')) return;
+
+    const res = await fetch("{{ route('gateway.delete', $gateway) }}", {
+        method: 'DELETE',
+        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+    });
+    const data = await res.json();
+    showToast(data.message, data.success ? 'success' : 'error');
+    if (data.success) setTimeout(() => window.location.href = "{{ route('gateway.index') }}", 1000);
+}
 </script>
 @endpush
