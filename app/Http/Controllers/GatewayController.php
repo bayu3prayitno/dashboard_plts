@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\CarbonImmutable;
 use Illuminate\View\View;
 use Illuminate\Http\JsonResponse;
 
@@ -41,24 +42,12 @@ class GatewayController extends Controller
 
     public function show(int $id): View
     {
-        $gateway = [
-            'id' => $id,
-            'name' => 'Gateway 01',
-            'location' => 'Lokasi A',
-            'device_id' => 'GATEWAY_001',
-            'firmware_version' => '1.0.1',
-            'status' => 'connected',
-            'infrastructure_health' => [
-                'gateway_connection' => 'connected',
-                'mqtt_broker' => 'connected',
-                'internet_connection' => 'connected',
-                'sd_card' => 'healthy',
-            ],
-            'last_communication' => now()->format('Y-m-d H:i:s'),
-            'connected_nodes' => ['DEVICE_001', 'DEVICE_002'],
-            'beacon_interval' => '5 menit',
-        ];
+        // Data tiruan yang sama dengan Dashboard — ganti dengan Gateway::with('devices')->findOrFail($id)
+        $now = CarbonImmutable::now(DashboardController::TZ);
 
-        return view('dashboard.gateway.show', ['gateway' => $gateway]);
+        return view('dashboard.gateway.show', [
+            'gateway' => DashboardController::mockGateway($now),
+            'devices' => DashboardController::withStatus(DashboardController::mockDevices($now), $now),
+        ]);
     }
 }

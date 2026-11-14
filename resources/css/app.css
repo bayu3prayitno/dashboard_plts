@@ -6,6 +6,92 @@
 @source '../**/*.js';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+
+    /* Tema "eco": arang gelap + hijau limau di atas abu-abu kehijauan muda */
+    --color-primary: #262a26;
+    --color-primary-dark: #171a17;
+    --color-primary-light: #a8d93a;
+    --color-primary-soft: #eef5dc;
+    --color-lime: #a8d93a;
+    --color-lime-dark: #6f9f12;
+    --color-canvas: #eceeea;
+    --color-ink: #1b1f1b;
+    --color-muted: #6f766f;
+    --color-line: #e4e7e2;
+}
+
+/* State sidebar di <html>: .sb-collapsed (desktop, mode rel ikon) & .sb-open (laci ponsel) */
+@custom-variant sb-collapsed (&:where(.sb-collapsed, .sb-collapsed *));
+@custom-variant sb-open (&:where(.sb-open, .sb-open *));
+
+body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+}
+
+button:not(:disabled),
+select,
+a {
+    cursor: pointer;
+}
+
+/* Latar banner hero */
+.hero-surface {
+    background:
+        radial-gradient(60% 90% at 62% 55%, rgb(255 255 255 / 0.55), transparent 70%),
+        linear-gradient(120deg, #e6eadf 0%, #d6ddcc 55%, #c2ccb6 100%);
+}
+
+.glass {
+    background: rgb(255 255 255 / 0.5);
+    border: 1px solid rgb(255 255 255 / 0.7);
+    backdrop-filter: blur(10px);
+}
+
+@layer components {
+    /* Item navigasi sidebar: lebar (ikon + label) atau rel (ikon saja) di desktop */
+    .nav-item {
+        @apply relative flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/10 hover:text-white
+            lg:sb-collapsed:size-11 lg:sb-collapsed:justify-center lg:sb-collapsed:p-0;
+    }
+
+    .nav-item-active {
+        @apply bg-white/15 text-white;
+    }
+
+    .nav-label {
+        @apply flex-1 text-left whitespace-nowrap lg:sb-collapsed:hidden;
+    }
+
+    /* Label melayang saat sidebar sempit */
+    .nav-hint {
+        @apply pointer-events-none absolute left-full z-50 ml-3 hidden rounded-lg bg-primary-dark px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-white shadow-lg
+            lg:sb-collapsed:group-hover:block lg:sb-collapsed:group-focus-visible:block;
+    }
+
+    .nav-badge {
+        @apply grid h-4.5 min-w-4.5 place-items-center rounded-full bg-lime px-1 text-[10px] font-bold text-ink
+            lg:sb-collapsed:absolute lg:sb-collapsed:-top-0.5 lg:sb-collapsed:-right-0.5;
+    }
+
+    .card {
+        @apply min-w-0 rounded-3xl bg-white p-5;
+    }
+
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors;
+    }
+
+    .btn-primary {
+        @apply bg-primary text-white hover:bg-primary-dark;
+    }
+
+    .btn-outline {
+        @apply border border-primary/25 text-ink hover:bg-primary-soft;
+    }
+
+    .btn-sm {
+        @apply px-3 py-1.5 text-xs;
+    }
 }

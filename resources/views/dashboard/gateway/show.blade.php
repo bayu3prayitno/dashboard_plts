@@ -1,194 +1,143 @@
 @extends('layouts.app')
 
-@section('title', 'Detail Gateway - IoT Dashboard')
-@section('page-title', $gateway['name'])
-@section('page-subtitle', 'Monitoring detail infrastruktur ' . $gateway['device_id'])
+@use('App\Support\Format')
+
+@section('title', $gateway['nama'].' - OmahIoT')
+
+@php
+    $tiles = [
+        ['icon' => 'router', 'label' => 'Gateway', 'status' => $gateway['status'], 'note' => $gateway['nama']],
+        ['icon' => 'server', 'label' => 'MQTT', 'status' => $gateway['mqtt_status'], 'note' => $gateway['broker']],
+        ['icon' => 'globe', 'label' => 'Internet', 'status' => $gateway['internet_status'], 'note' => 'Koneksi gateway ke jaringan luar'],
+    ];
+    $identity = [
+        ['Nama', $gateway['nama']],
+        ['Lokasi', $gateway['lokasi']],
+        ['Interval beacon', $gateway['beacon_menit'].' menit'],
+        ['Topic MQTT', $gateway['topic']],
+        ['Halaman web lokal', 'http://'.$gateway['ip_lokal']],
+    ];
+@endphp
 
 @section('content')
-<div class="space-y-6">
-    <!-- Gateway Information -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Device Info -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Informasi Gateway</h3>
-            <div class="space-y-3">
-                <div>
-                    <p class="text-gray-500 text-sm">ID Gateway</p>
-                    <p class="font-mono text-gray-800">{{ $gateway['device_id'] }}</p>
-                </div>
-                <div>
-                    <p class="text-gray-500 text-sm">Nama</p>
-                    <p class="text-gray-800">{{ $gateway['name'] }}</p>
-                </div>
-                <div>
-                    <p class="text-gray-500 text-sm">Lokasi</p>
-                    <p class="text-gray-800">{{ $gateway['location'] }}</p>
-                </div>
-                <div>
-                    <p class="text-gray-500 text-sm">Firmware Version</p>
-                    <p class="text-gray-800">{{ $gateway['firmware_version'] }}</p>
-                </div>
-                <div>
-                    <p class="text-gray-500 text-sm">Beacon Interval</p>
-                    <p class="text-gray-800">{{ $gateway['beacon_interval'] }}</p>
-                </div>
-                <div>
-                    <p class="text-gray-500 text-sm">Update Terakhir</p>
-                    <p class="text-gray-800">{{ $gateway['last_communication'] }}</p>
-                </div>
-            </div>
+    {{-- Judul halaman --}}
+    <div class="mb-5 flex flex-wrap items-end justify-between gap-3 px-1">
+        <div>
+            <h1 class="text-2xl font-semibold sm:text-3xl">Gateway</h1>
+            <p class="mt-1 text-sm text-muted">Status penerima LoRa, koneksi MQTT, dan internet.</p>
         </div>
-
-        <!-- Infrastructure Health -->
-        <div class="lg:col-span-2 bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Kesehatan Infrastruktur</h3>
-            <div class="space-y-3">
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
-                    <div>
-                        <p class="font-semibold text-gray-800">Gateway Connection</p>
-                        <p class="text-xs text-gray-600">Koneksi utama Gateway</p>
-                    </div>
-                    <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        <span class="inline-block w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></span>
-                        {{ ucfirst($gateway['infrastructure_health']['gateway_connection']) }}
-                    </span>
-                </div>
-
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
-                    <div>
-                        <p class="font-semibold text-gray-800">MQTT Broker</p>
-                        <p class="text-xs text-gray-600">Koneksi ke MQTT server</p>
-                    </div>
-                    <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        <span class="inline-block w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></span>
-                        {{ ucfirst($gateway['infrastructure_health']['mqtt_broker']) }}
-                    </span>
-                </div>
-
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
-                    <div>
-                        <p class="font-semibold text-gray-800">Internet Connection</p>
-                        <p class="text-xs text-gray-600">Koneksi internet WAN</p>
-                    </div>
-                    <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        <span class="inline-block w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></span>
-                        {{ ucfirst($gateway['infrastructure_health']['internet_connection']) }}
-                    </span>
-                </div>
-
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
-                    <div>
-                        <p class="font-semibold text-gray-800">SD Card</p>
-                        <p class="text-xs text-gray-600">Status backup data</p>
-                    </div>
-                    <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        <span class="inline-block w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></span>
-                        {{ ucfirst($gateway['infrastructure_health']['sd_card']) }}
-                    </span>
-                </div>
-            </div>
-        </div>
+        <button type="button" data-modal-open="gateway-form" class="btn btn-outline bg-white">
+            <x-icon name="pencil" :size="15" /> Ubah identitas
+        </button>
     </div>
 
-    <!-- Connected Nodes -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Node Sensor Terhubung</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            @foreach($gateway['connected_nodes'] as $node)
-            <div class="p-4 border border-gray-200 rounded-lg hover:border-blue-500 transition">
-                <div class="flex items-center mb-2">
-                    <span class="inline-block w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></span>
-                    <p class="font-semibold text-gray-800">{{ $node }}</p>
-                </div>
-                <p class="text-xs text-gray-600">Online - Signal Kuat</p>
-                <div class="mt-3 pt-3 border-t border-gray-200">
-                    <p class="text-xs text-gray-500">RSSI: -85 dBm | SNR: 10 dB</p>
-                </div>
-            </div>
-            @endforeach
-        </div>
+    {{-- Status --}}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        @foreach ($tiles as $t)
+            <section class="card">
+                <div class="flex items-center gap-2 text-sm text-muted"><x-icon :name="$t['icon']" :size="16" /> {{ $t['label'] }}</div>
+                <div class="mt-3"><x-status-badge :status="$t['status']" /></div>
+                <p class="mt-2 text-xs break-all text-muted">{{ $t['note'] }}</p>
+            </section>
+        @endforeach
+        <section class="card">
+            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="clock" :size="16" /> Komunikasi terakhir</div>
+            <p class="mt-3 text-xl font-semibold">{{ Format::relTime($gateway['last_seen']) }}</p>
+            <p class="mt-2 text-xs text-muted">{{ $gateway['last_seen']->translatedFormat('d M Y, H:i') }} WIB</p>
+        </section>
     </div>
 
-    <!-- Performance Metrics -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Network Performance -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Performa Jaringan</h3>
-            <div class="space-y-3">
-                <div>
-                    <p class="text-gray-600 text-sm mb-2">Packet Transmission Success Rate</p>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-green-600 h-2 rounded-full" style="width: 98%"></div>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">98% - Excellent</p>
-                </div>
-                <div>
-                    <p class="text-gray-600 text-sm mb-2">Average Response Time</p>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-blue-600 h-2 rounded-full" style="width: 65%"></div>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">245 ms</p>
-                </div>
-                <div>
-                    <p class="text-gray-600 text-sm mb-2">Uptime</p>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-green-600 h-2 rounded-full" style="width: 99.95%"></div>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">99.95% - 15 days</p>
-                </div>
+    <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+        {{-- Identitas --}}
+        <section class="card">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <h2 class="text-base font-semibold">Identitas</h2>
             </div>
-        </div>
+            <dl class="space-y-3 text-sm">
+                @foreach ($identity as [$label, $value])
+                    <div class="flex justify-between gap-4">
+                        <dt class="shrink-0 text-muted">{{ $label }}</dt>
+                        <dd class="text-right font-medium break-all">{{ $value }}</dd>
+                    </div>
+                @endforeach
+            </dl>
+            <p class="mt-4 rounded-2xl bg-canvas p-3 text-xs text-muted">
+                Gateway juga menyimpan data ke CSV di kartu SD. Jika koneksi ke website terputus, data dapat
+                diunduh dari halaman web lokal gateway di jaringan yang sama.
+            </p>
+        </section>
 
-        <!-- Data Backup Status -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Status Backup SD Card</h3>
-            <div class="space-y-4">
-                <div>
-                    <div class="flex justify-between items-center mb-2">
-                        <p class="text-gray-600 text-sm">SD Card Usage</p>
-                        <p class="font-semibold text-gray-800">45%</p>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="bg-yellow-500 h-2 rounded-full" style="width: 45%"></div>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-2 pt-2 border-t">
-                    <div>
-                        <p class="text-xs text-gray-600">Total Capacity</p>
-                        <p class="text-sm font-semibold text-gray-800">32 GB</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-600">Used</p>
-                        <p class="text-sm font-semibold text-gray-800">14.4 GB</p>
-                    </div>
-                </div>
-                <div class="p-3 bg-blue-50 rounded text-xs text-blue-800">
-                    <p>💾 Last backup: 30 minutes ago</p>
-                </div>
+        {{-- Node terhubung --}}
+        <section class="card xl:col-span-2">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <h2 class="text-base font-semibold">Node Terhubung</h2>
             </div>
-        </div>
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-[560px] text-left text-sm">
+                    <thead>
+                        <tr class="border-b border-line text-xs text-muted">
+                            @foreach (['Node', 'Status', 'RSSI', 'SNR', 'Packet loss', 'Paket terakhir'] as $h)
+                                <th class="px-3 py-2.5 font-medium whitespace-nowrap">{{ $h }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-line">
+                        @foreach ($devices as $d)
+                            <tr>
+                                <td class="px-3 py-3 align-middle"><a href="{{ route('devices.show', $d['id']) }}" class="font-medium hover:text-primary hover:underline">{{ $d['nama'] }}</a></td>
+                                <td class="px-3 py-3 align-middle"><x-status-badge :status="$d['status']" /></td>
+                                <td class="px-3 py-3 align-middle tabular-nums">{{ $d['rssi'] }} dBm</td>
+                                <td class="px-3 py-3 align-middle tabular-nums">{{ Format::num($d['snr'], 1) }} dB</td>
+                                <td class="px-3 py-3 align-middle tabular-nums">{{ Format::num($d['packet_loss'], 1) }} %</td>
+                                <td class="px-3 py-3 align-middle text-xs whitespace-nowrap text-muted">{{ Format::relTime($d['last_seen']) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
-    <!-- Recent Events Log -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Log Aktivitas Terbaru</h3>
-        <div class="space-y-3 max-h-96 overflow-y-auto">
-            <div class="p-3 border-l-4 border-green-500 bg-green-50 rounded">
-                <p class="text-sm font-semibold text-green-800">Connected</p>
-                <p class="text-xs text-green-600">Gateway terhubung ke MQTT broker</p>
-                <p class="text-xs text-green-500">10 menit yang lalu</p>
+    {{-- Modal ubah identitas --}}
+    <div id="gateway-form" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4" data-modal>
+        <div role="dialog" aria-modal="true" aria-labelledby="gateway-form-title" class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6">
+            <div class="mb-5 flex items-center justify-between">
+                <h2 id="gateway-form-title" class="text-lg font-semibold">Ubah Gateway</h2>
+                <button type="button" data-modal-close aria-label="Tutup" class="rounded-full p-1.5 text-muted hover:bg-canvas">
+                    <x-icon name="x" :size="18" />
+                </button>
             </div>
-            <div class="p-3 border-l-4 border-blue-500 bg-blue-50 rounded">
-                <p class="text-sm font-semibold text-blue-800">Data Received</p>
-                <p class="text-xs text-blue-600">Menerima data dari 3 node sensor</p>
-                <p class="text-xs text-blue-500">15 menit yang lalu</p>
-            </div>
-            <div class="p-3 border-l-4 border-yellow-500 bg-yellow-50 rounded">
-                <p class="text-sm font-semibold text-yellow-800">Backup Completed</p>
-                <p class="text-xs text-yellow-600">SD Card backup selesai (156 MB)</p>
-                <p class="text-xs text-yellow-500">30 menit yang lalu</p>
-            </div>
+            {{-- TODO: arahkan ke route update gateway saat backend tersedia --}}
+            <form class="space-y-4" onsubmit="event.preventDefault(); alert('Penyimpanan identitas gateway akan aktif setelah backend tersedia.');">
+                <label class="block text-sm">
+                    <span class="mb-1.5 block font-medium">Nama gateway</span>
+                    <input name="nama" value="{{ $gateway['nama'] }}" required
+                        class="w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
+                </label>
+                <label class="block text-sm">
+                    <span class="mb-1.5 block font-medium">Lokasi</span>
+                    <input name="lokasi" value="{{ $gateway['lokasi'] }}" required
+                        class="w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
+                </label>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" data-modal-close class="btn text-muted hover:bg-canvas hover:text-ink">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
         </div>
     </div>
-</div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const modal = document.getElementById('gateway-form');
+    const open = () => { modal.classList.remove('hidden'); modal.classList.add('flex'); modal.querySelector('input')?.focus(); };
+    const close = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+    document.querySelector('[data-modal-open="gateway-form"]').addEventListener('click', open);
+    modal.querySelectorAll('[data-modal-close]').forEach((b) => b.addEventListener('click', close));
+    modal.addEventListener('mousedown', (e) => { if (e.target === modal) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+})();
+</script>
+@endpush
