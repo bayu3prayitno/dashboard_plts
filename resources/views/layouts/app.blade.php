@@ -112,7 +112,7 @@
     {{-- ================= KONTEN ================= --}}
     <div class="min-w-0 flex-1">
         {{-- Header transparan; di Dashboard ia menumpang di atas banner hero --}}
-        <header class="relative z-20 flex h-16 items-center gap-3 px-1 sm:px-4">
+        <header data-app-header class="sticky top-0 z-30 flex h-16 items-center gap-3 px-1 transition-colors sm:px-4 [&.is-stuck]:bg-canvas/20 [&.is-stuck]:backdrop-blur-md">
             <button type="button" data-sidebar-toggle aria-label="Buka menu"
                 class="grid size-10 shrink-0 place-items-center rounded-full bg-white text-lime-dark shadow-sm lg:hidden">
                 <x-logo :size="22" />
@@ -195,6 +195,12 @@
             document.querySelector('[data-notifications] [data-panel]')?.classList.add('hidden');
         }
     });
+
+    // Header sticky: beri latar hanya saat halaman di-scroll agar banner hero tetap utuh di atas
+    const header = document.querySelector('[data-app-header]');
+    const onScroll = () => header.classList.toggle('is-stuck', window.scrollY > 4);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
 
     // Cari perangkat
     const devices = @json($layoutDevices);
