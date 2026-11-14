@@ -29,8 +29,12 @@ class AppServiceProvider extends ServiceProvider
             $alerts = DashboardController::mockAlerts($now);
 
             $view->with([
-                // Halaman ber-layout ini selalu di balik middleware auth. Peran belum ada di tabel users.
-                'layoutUser' => ['nama' => auth()->user()?->name ?? 'Tamu', 'role' => 'Admin'],
+                // Halaman ber-layout ini selalu di balik middleware auth
+                'layoutUser' => [
+                    'nama' => auth()->user()?->name ?? 'Tamu',
+                    'role' => auth()->user()?->roleLabel() ?? '',
+                    'super' => (bool) auth()->user()?->isSuperAdmin(),
+                ],
                 'layoutActiveAlerts' => count(array_filter($alerts, fn ($a) => $a['status'] !== 'selesai')),
                 'layoutFreshAlerts' => array_values(array_filter($alerts, fn ($a) => $a['status'] === 'baru')),
                 'layoutDevices' => array_map(fn ($d) => [

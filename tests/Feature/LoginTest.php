@@ -26,11 +26,38 @@ class LoginTest extends TestCase
 
     public function test_user_can_login_with_username(): void
     {
-        $user = User::factory()->create(['name' => 'admin', 'password' => 'password']);
+        $user = User::factory()->create(['username' => 'admin', 'password' => 'password']);
 
         $this->post('/login', ['login' => 'admin', 'password' => 'password'])
             ->assertRedirect(route('dashboard.index'));
         $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_inactive_user_cannot_login(): void
+    {
+        User::factory()->inactive()->create(['email' => 'off@omahiot.example', 'password' => 'password']);
+
+        $this->post('/login', ['login' => 'off@omahiot.example', 'password' => 'password'])
+            ->assertSessionHasErrors(['login' => 'Akun Anda dinonaktifkan. Hubungi Super Admin.']);
+        $this->assertGuest();
+    }
+
+    public function test_super_admin_sees_name_role_and_all_menus(): void
+    {
+        $this->actingAs(User::factory()->create(['name' => 'Rina']))
+            ->get('/dashboard')->assertOk()
+            ->assertSee('Rina')->assertSee('Super Admin')
+            ->assertSee('aria-label="Pengguna"', false)
+            ->assertSee('aria-label="Pengaturan"', false);
+    }
+
+    public function test_seeder_creates_only_a_super_admin(): void
+    {
+        $this->seed();
+
+        $this->assertSame(['super_admin'], User::pluck('role')->unique()->values()->all());
+        $this->post('/login', ['login' => 'superadmin', 'password' => 'password'])
+            ->assertRedirect(route('dashboard.index'));
     }
 
     public function test_wrong_password_is_rejected(): void

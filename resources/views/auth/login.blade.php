@@ -14,7 +14,6 @@
     // Akun demo hanya ditampilkan di lingkungan lokal (dibuat oleh DatabaseSeeder)
     $demo = app()->isLocal() ? [
         ['Super Admin', 'superadmin@omahiot.example'],
-        ['Admin', 'admin@omahiot.example'],
     ] : [];
 @endphp
 <body class="font-sans antialiased">

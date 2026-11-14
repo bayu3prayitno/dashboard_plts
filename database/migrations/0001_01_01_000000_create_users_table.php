@@ -12,12 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
+            // Sesuai ERD (erd.jpg)
             $table->id();
             $table->string('name');
+            $table->string('username')->unique();
             $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->rememberToken();
+            // Enum mengikuti ERD; untuk sementara aplikasi hanya memakai super_admin
+            $table->enum('role', ['super_admin', 'admin'])->default('super_admin');
+            $table->boolean('is_active')->default(true);
+            $table->rememberToken(); // tidak ada di ERD; dibutuhkan fitur "Ingat saya" saat login
             $table->timestamps();
         });
 

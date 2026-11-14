@@ -31,10 +31,12 @@
         ['route' => 'gateway.index', 'is' => 'gateway.*', 'icon' => 'router', 'label' => 'Gateway'],
     ];
     $navAdmin = [
-        ['route' => 'settings.users', 'is' => 'settings.users', 'icon' => 'users', 'label' => 'Pengguna'],
-        ['route' => 'settings.system', 'is' => ['settings.system', 'settings.index', 'settings.scope'], 'icon' => 'settings', 'label' => 'Pengaturan'],
+        ['route' => 'settings.users', 'is' => 'settings.users', 'icon' => 'users', 'label' => 'Pengguna', 'super' => true],
+        ['route' => 'settings.system', 'is' => ['settings.system', 'settings.index', 'settings.scope'], 'icon' => 'settings', 'label' => 'Pengaturan', 'super' => true],
         ['route' => 'settings.auditLog', 'is' => 'settings.auditLog', 'icon' => 'scroll-text', 'label' => 'Log Aktivitas'],
     ];
+    // Menu khusus Super Admin disembunyikan untuk Admin (route-nya belum dikunci di server)
+    $navAdmin = array_filter($navAdmin, fn ($item) => ! ($item['super'] ?? false) || $layoutUser['super']);
     $initials = collect(explode(' ', $layoutUser['nama']))->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->join('');
 @endphp
 <body class="font-sans antialiased">

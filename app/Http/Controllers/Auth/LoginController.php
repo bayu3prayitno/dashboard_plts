@@ -33,14 +33,22 @@ class LoginController extends Controller
             ]);
         }
 
-        // Boleh masuk dengan email atau username (kolom name)
-        $field = filter_var($data['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'name';
+        // Boleh masuk dengan email atau username
+        $field = filter_var($data['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+        $credentials = [$field => $data['login'], 'password' => $data['password']];
 
-        if (! Auth::attempt([$field => $data['login'], 'password' => $data['password']], $request->boolean('remember'))) {
+        if (! Auth::validate($credentials)) {
             RateLimiter::hit($key);
 
             throw ValidationException::withMessages([
                 'login' => 'Email/username atau kata sandi salah.',
+            ]);
+        }
+
+        // Kredensial benar, tetapi akun dinonaktifkan oleh Super Admin
+        if (! Auth::attempt([...$credentials, 'is_active' => true], $request->boolean('remember'))) {
+            throw ValidationException::withMessages([
+                'login' => 'Akun Anda dinonaktifkan. Hubungi Super Admin.',
             ]);
         }
 
