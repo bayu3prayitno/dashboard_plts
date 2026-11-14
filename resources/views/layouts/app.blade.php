@@ -17,6 +17,7 @@
     $pageNames = [
         'devices' => 'Perangkat', 'historical' => 'Histori', 'alerts' => 'Peringatan', 'gateway' => 'Gateway',
         'settings.users' => 'Pengguna', 'settings.auditLog' => 'Log Aktivitas', 'settings' => 'Pengaturan',
+        'profile' => 'Profil',
     ];
     $pageName = 'Dashboard';
     foreach ($pageNames as $prefix => $name) {
@@ -108,8 +109,8 @@
                         <span class="nav-hint">Masuk</span>
                     </a>
                 @endauth
-                <a href="{{ route('settings.index') }}" aria-label="Profil {{ $layoutUser['nama'] }}"
-                   class="group relative mt-2 flex items-center gap-3 rounded-2xl px-1 lg:sb-collapsed:px-0">
+                <a href="{{ route('profile.show') }}" aria-label="Profil {{ $layoutUser['nama'] }}"
+                   class="group relative mt-2 flex items-center gap-3 rounded-2xl px-1 transition-colors hover:bg-white/10 lg:sb-collapsed:px-0 {{ Route::is('profile.*') ? 'bg-white/15' : '' }}">
                     <span class="grid size-11 shrink-0 place-items-center rounded-2xl bg-lime text-sm font-bold text-ink">{{ $initials }}</span>
                     <span class="nav-label">
                         <span class="block text-sm leading-tight font-semibold">{{ $layoutUser['nama'] }}</span>
