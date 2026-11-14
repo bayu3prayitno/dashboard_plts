@@ -2,56 +2,57 @@
 
 @section('title', 'Edit Perangkat - IoT Dashboard')
 @section('page-title', 'Edit Perangkat')
-@section('page-subtitle', 'Perbarui informasi perangkat ' . $device['name'])
+@section('page-subtitle', 'Perbarui informasi perangkat ' . $device->name)
 
 @section('content')
 <div class="max-w-2xl">
     <div class="bg-white rounded-lg shadow p-8">
-        <form method="POST" action="{{ route('devices.update', $device['id']) }}" class="space-y-6">
+        <form method="POST" action="{{ route('devices.update', $device) }}" class="space-y-6">
             @csrf
             @method('PUT')
 
-            <!-- Device ID (Read-only) -->
+            <!-- Node ID (Read-only) -->
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">Device ID</label>
-                <input type="text" value="DEVICE_00{{ $device['id'] }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100" disabled>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">ID Node</label>
+                <input type="text" value="DEVICE_{{ str_pad($device->node_id, 3, '0', STR_PAD_LEFT) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100" disabled>
                 <p class="text-xs text-gray-500 mt-1">Identitas perangkat tidak dapat diubah</p>
             </div>
 
             <!-- Device Name -->
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Nama Perangkat</label>
-                <input type="text" name="device_name" value="{{ $device['name'] }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                <input type="text" name="name" value="{{ old('name', $device->name) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                @error('name')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
             </div>
 
             <!-- Location -->
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Lokasi</label>
-                <select name="location" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                    <option value="">Pilih Lokasi</option>
-                    <option value="Lokasi A" @selected($device['location'] === 'Lokasi A')>Lokasi A</option>
-                    <option value="Lokasi B" @selected($device['location'] === 'Lokasi B')>Lokasi B</option>
-                    <option value="Lokasi C" @selected($device['location'] === 'Lokasi C')>Lokasi C</option>
-                </select>
+                <input type="text" name="location" value="{{ old('location', $device->location) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                @error('location')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
             </div>
 
             <!-- Gateway -->
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Gateway Terhubung</label>
-                <select name="gateway" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                <select name="gateway_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                     <option value="">Pilih Gateway</option>
-                    <option value="Gateway 01" @selected($device['gateway'] === 'Gateway 01')>Gateway 01</option>
-                    <option value="Gateway 02" @selected($device['gateway'] === 'Gateway 02')>Gateway 02</option>
-                    <option value="Gateway 03" @selected($device['gateway'] === 'Gateway 03')>Gateway 03</option>
+                    @foreach($gateways as $gateway)
+                        <option value="{{ $gateway->id }}" @selected(old('gateway_id', $device->gateway_id) == $gateway->id)>{{ $gateway->name }}</option>
+                    @endforeach
                 </select>
+                @error('gateway_id')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
             </div>
+
+            <!-- Node ID field for validation (tetap dikirim agar update konsisten dengan store) -->
+            <input type="hidden" name="node_id" value="{{ $device->node_id }}">
 
             <!-- Status -->
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Status</label>
                 <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="active">Aktif</option>
-                    <option value="inactive">Nonaktif</option>
+                    <option value="active" @selected($device->is_active)>Aktif</option>
+                    <option value="inactive" @selected(! $device->is_active)>Nonaktif</option>
                 </select>
             </div>
 

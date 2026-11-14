@@ -22,6 +22,18 @@ class ActivityLog extends Model
         ];
     }
 
+    /** Mencatat perubahan ke audit log (PRD 4.5). $before/$after berisi atribut sebelum & sesudah. */
+    public static function record(?int $userId, string $action, Model $subject, ?array $before = null, ?array $after = null): self
+    {
+        return static::create([
+            'user_id' => $userId,
+            'action' => $action,
+            'subject_type' => $subject::class,
+            'subject_id' => $subject->getKey(),
+            'properties' => ['before' => $before, 'after' => $after],
+        ]);
+    }
+
     /** Pengguna yang melakukan aksi (NULL untuk aktivitas sistem). */
     public function user(): BelongsTo
     {

@@ -37,10 +37,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [DeviceController::class, 'index'])->name('index');
         Route::get('/create', [DeviceController::class, 'create'])->name('create');
         Route::post('/', [DeviceController::class, 'store'])->name('store');
-        Route::get('/{id}', [DeviceController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [DeviceController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [DeviceController::class, 'update'])->name('update');
-        Route::delete('/{id}', [DeviceController::class, 'delete'])->name('delete');
+        Route::get('/{device}', [DeviceController::class, 'show'])->name('show');
+        Route::get('/{device}/edit', [DeviceController::class, 'edit'])->name('edit');
+        Route::put('/{device}', [DeviceController::class, 'update'])->name('update');
+        Route::delete('/{device}', [DeviceController::class, 'delete'])->name('delete');
     });
 
     // Alerts Management
@@ -62,7 +62,12 @@ Route::middleware('auth')->group(function () {
     // Gateway Management
     Route::prefix('gateway')->name('gateway.')->group(function () {
         Route::get('/', [GatewayController::class, 'index'])->name('index');
-        Route::get('/{id}', [GatewayController::class, 'show'])->name('show');
+        Route::get('/create', [GatewayController::class, 'create'])->name('create');
+        Route::post('/', [GatewayController::class, 'store'])->name('store');
+        Route::get('/{gateway}', [GatewayController::class, 'show'])->name('show');
+        Route::get('/{gateway}/edit', [GatewayController::class, 'edit'])->name('edit');
+        Route::put('/{gateway}', [GatewayController::class, 'update'])->name('update');
+        Route::delete('/{gateway}', [GatewayController::class, 'delete'])->name('delete');
     });
 
     // Settings

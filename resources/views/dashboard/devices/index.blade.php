@@ -40,19 +40,20 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-                @foreach($devices as $device)
+                @forelse($devices as $device)
+                @php $status = $device->status(); @endphp
                 <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm text-gray-800 font-mono">DEVICE_00{{ $device['id'] }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-800">{{ $device['name'] }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $device['location'] }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $device['gateway'] }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-800 font-mono">DEVICE_{{ str_pad($device->node_id, 3, '0', STR_PAD_LEFT) }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-800">{{ $device->name }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">{{ $device->location }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">{{ $device->gateway?->name ?? '-' }}</td>
                     <td class="px-6 py-4 text-sm">
-                        @if($device['status'] === 'online')
+                        @if($status === 'online')
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
                                 <span class="inline-block w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></span>
                                 Online
                             </span>
-                        @elseif($device['status'] === 'offline')
+                        @elseif($status === 'offline')
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
                                 <span class="inline-block w-2 h-2 bg-red-600 rounded-full mr-2"></span>
                                 Offline
@@ -64,32 +65,42 @@
                             </span>
                         @endif
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $device['last_update'] }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">{{ $device->last_seen_at?->diffForHumans() ?? 'Belum ada data' }}</td>
                     <td class="px-6 py-4 text-sm">
                         <div class="flex gap-2">
-                            <a href="{{ route('devices.show', $device['id']) }}" class="text-blue-600 hover:text-blue-800 font-semibold">Lihat</a>
-                            <a href="{{ route('devices.edit', $device['id']) }}" class="text-yellow-600 hover:text-yellow-800 font-semibold">Edit</a>
-                            <button onclick="deleteDevice({{ $device['id'] }})" class="text-red-600 hover:text-red-800 font-semibold">Hapus</button>
+                            <a href="{{ route('devices.show', $device) }}" class="text-blue-600 hover:text-blue-800 font-semibold">Lihat</a>
+                            <a href="{{ route('devices.edit', $device) }}" class="text-yellow-600 hover:text-yellow-800 font-semibold">Edit</a>
+                            <button onclick="deleteDevice({{ $device->id }})" class="text-red-600 hover:text-red-800 font-semibold">Hapus</button>
                         </div>
                     </td>
                 </tr>
-                @endforeach
+                @empty
+                <tr>
+                    <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">Belum ada perangkat terdaftar.</td>
+                </tr>
+                @endforelse
             </tbody>
         </table>
     </div>
 
-    <!-- Pagination or Summary -->
-    <div class="text-sm text-gray-600">
-        Menampilkan {{ count($devices) }} dari {{ count($devices) }} perangkat
+    <!-- Pagination -->
+    <div class="flex justify-between items-center text-sm text-gray-600">
+        <span>Menampilkan {{ $devices->count() }} dari {{ $devices->total() }} perangkat</span>
+        {{ $devices->links() }}
     </div>
 </div>
 
 <script>
-function deleteDevice(id) {
-    if (confirm('Apakah Anda yakin ingin menghapus perangkat ini?')) {
-        // Implement delete logic
-        console.log('Delete device:', id);
-    }
+async function deleteDevice(id) {
+    if (!confirm('Apakah Anda yakin ingin menghapus perangkat ini?')) return;
+
+    const res = await fetch(`/devices/${id}`, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+    });
+    const data = await res.json();
+    showToast(data.message, data.success ? 'success' : 'error');
+    if (data.success) setTimeout(() => window.location.reload(), 1000);
 }
 </script>
 @endsection

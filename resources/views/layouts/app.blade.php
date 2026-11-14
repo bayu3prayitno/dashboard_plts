@@ -233,6 +233,63 @@
     document.addEventListener('click', (e) => { if (!notif.contains(e.target)) panel.classList.add('hidden'); });
 })();
 </script>
+{{-- Notifikasi toast (global): pesan flash dari server atau showToast() dari JavaScript --}}
+<div class="pointer-events-none fixed inset-x-0 top-5 z-[60] flex justify-center px-4 sm:inset-x-auto sm:right-6 sm:justify-end" aria-live="polite">
+    <div data-toast-box class="pointer-events-auto invisible flex w-full max-w-sm translate-y-2 items-start gap-3 rounded-2xl border bg-white p-4 opacity-0 shadow-xl shadow-black/10 transition-all duration-300">
+        <span data-toast-icon class="grid size-9 shrink-0 place-items-center rounded-full">
+            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>
+        </span>
+        <div class="min-w-0 flex-1">
+            <p data-toast-title class="text-sm font-semibold text-ink"></p>
+            <p data-toast-message class="mt-0.5 break-words text-sm text-muted"></p>
+        </div>
+        <button type="button" data-toast-close aria-label="Tutup" class="-m-1 rounded-full p-1 text-muted hover:bg-canvas hover:text-ink">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+    </div>
+</div>
+<script>
+(function () {
+    const box = document.querySelector('[data-toast-box]');
+    const icon = box.querySelector('[data-toast-icon]');
+    const title = box.querySelector('[data-toast-title]');
+    const message = box.querySelector('[data-toast-message]');
+    const tones = {
+        success: { border: 'border-emerald-200', icon: ['bg-emerald-100', 'text-emerald-700'], title: 'Berhasil' },
+        error: { border: 'border-red-200', icon: ['bg-red-100', 'text-red-700'], title: 'Gagal' },
+    };
+    const borders = ['border-emerald-200', 'border-red-200'];
+    const iconTones = ['bg-emerald-100', 'text-emerald-700', 'bg-red-100', 'text-red-700'];
+    let timer;
+
+    const hide = () => {
+        box.classList.remove('opacity-100', 'translate-y-0');
+        box.classList.add('opacity-0', 'translate-y-2', 'invisible');
+    };
+
+    window.showToast = (text, type = 'success') => {
+        const tone = tones[type] ?? tones.success;
+        box.classList.remove(...borders);
+        box.classList.add(tone.border);
+        icon.classList.remove(...iconTones);
+        icon.classList.add(...tone.icon);
+        title.textContent = tone.title;
+        message.textContent = text;
+        box.classList.remove('opacity-0', 'translate-y-2', 'invisible');
+        box.classList.add('opacity-100', 'translate-y-0');
+        clearTimeout(timer);
+        timer = setTimeout(hide, 4500);
+    };
+
+    box.querySelector('[data-toast-close]').addEventListener('click', hide);
+})();
+</script>
+@if(session('success'))
+<script>document.addEventListener('DOMContentLoaded', () => showToast(@json(session('success')), 'success'));</script>
+@endif
+@if(session('error'))
+<script>document.addEventListener('DOMContentLoaded', () => showToast(@json(session('error')), 'error'));</script>
+@endif
 @stack('scripts')
 </body>
 </html>

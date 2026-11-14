@@ -10,6 +10,15 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['gateway_id', 'node_id', 'name', 'location', 'is_active', 'last_seen_at'])]
 class Device extends Model
 {
+    public const STATUS_ONLINE = 'online';
+
+    public const STATUS_OFFLINE = 'offline';
+
+    public const STATUS_INACTIVE = 'nonaktif';
+
+    /** Default timeout offline (PRD 5.1: minimal 10–15 menit). */
+    public const DEFAULT_OFFLINE_TIMEOUT_MINUTES = 15;
+
     /**
      * Get the attributes that should be cast.
      *
@@ -21,6 +30,28 @@ class Device extends Model
             'is_active' => 'boolean',
             'last_seen_at' => 'datetime',
         ];
+    }
+
+    /** Timeout offline dalam menit, dari tabel settings (key: offline_timeout_minutes). */
+    public static function offlineTimeoutMinutes(): int
+    {
+        $value = Setting::find('offline_timeout_minutes')?->value;
+
+        return is_numeric($value) ? (int) $value : self::DEFAULT_OFFLINE_TIMEOUT_MINUTES;
+    }
+
+    /** Status untuk tampilan: nonaktif, online, atau offline (dihitung dari last_seen_at). */
+    public function status(): string
+    {
+        if (! $this->is_active) {
+            return self::STATUS_INACTIVE;
+        }
+
+        if ($this->last_seen_at === null || $this->last_seen_at->lt(now()->subMinutes(self::offlineTimeoutMinutes()))) {
+            return self::STATUS_OFFLINE;
+        }
+
+        return self::STATUS_ONLINE;
     }
 
     public function gateway(): BelongsTo
