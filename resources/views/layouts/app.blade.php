@@ -90,12 +90,22 @@
                     <span class="nav-label">Unduh CSV 24 jam</span>
                     <span class="nav-hint">Unduh CSV 24 jam</span>
                 </a>
-                <button type="button" aria-label="Logout" class="group nav-item"
-                    onclick="alert('Logout akan aktif setelah autentikasi diimplementasikan')">
-                    <x-icon name="log-out" :size="19" />
-                    <span class="nav-label">Logout</span>
-                    <span class="nav-hint">Logout</span>
-                </button>
+                @auth
+                    <form method="POST" action="{{ route('logout') }}" class="contents">
+                        @csrf
+                        <button type="submit" aria-label="Logout" class="group nav-item">
+                            <x-icon name="log-out" :size="19" />
+                            <span class="nav-label">Logout</span>
+                            <span class="nav-hint">Logout</span>
+                        </button>
+                    </form>
+                @else
+                    <a href="{{ route('login') }}" aria-label="Masuk" class="group nav-item">
+                        <x-icon name="log-out" :size="19" class="rotate-180" />
+                        <span class="nav-label">Masuk</span>
+                        <span class="nav-hint">Masuk</span>
+                    </a>
+                @endauth
                 <a href="{{ route('settings.index') }}" aria-label="Profil {{ $layoutUser['nama'] }}"
                    class="group relative mt-2 flex items-center gap-3 rounded-2xl px-1 lg:sb-collapsed:px-0">
                     <span class="grid size-11 shrink-0 place-items-center rounded-2xl bg-lime text-sm font-bold text-ink">{{ $initials }}</span>

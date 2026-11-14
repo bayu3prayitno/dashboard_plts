@@ -7,14 +7,22 @@ use App\Http\Controllers\AlertController;
 use App\Http\Controllers\HistoricalDataController;
 use App\Http\Controllers\GatewayController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\Auth\LoginController;
+
+// Autentikasi
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'create'])->name('login');
+    Route::post('/login', [LoginController::class, 'store'])->name('login.store');
+});
+Route::post('/logout', [LoginController::class, 'destroy'])->middleware('auth')->name('logout');
 
 // Redirect root to dashboard
 Route::get('/', function () {
     return redirect('/dashboard');
 });
 
-// Dashboard Routes (for testing - uncomment ['auth'] middleware after implementing login)
-Route::group([], function () {
+// Semua halaman dashboard wajib login; tamu diarahkan ke /login (route bernama 'login')
+Route::middleware('auth')->group(function () {
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 

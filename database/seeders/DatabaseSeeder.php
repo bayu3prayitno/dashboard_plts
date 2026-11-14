@@ -15,11 +15,16 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Akun demo untuk halaman login (kata sandi: "password"). Jangan dipakai di produksi.
+        // Masuk dengan email atau username (kolom name).
+        foreach ([
+            ['name' => 'superadmin', 'email' => 'superadmin@omahiot.example'],
+            ['name' => 'admin', 'email' => 'admin@omahiot.example'],
+        ] as $user) {
+            User::updateOrCreate(
+                ['email' => $user['email']],
+                ['name' => $user['name'], 'password' => 'password', 'email_verified_at' => now()],
+            );
+        }
     }
 }
