@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Device;
 use App\Models\Gateway;
 use App\Models\Measurement;
+use App\Services\AlertEvaluator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\Validator;
  */
 class TelemetryIngestor
 {
+    public function __construct(private AlertEvaluator $alerts) {}
+
     public function ingest(string $gatewayCode, array $payload): ?Measurement
     {
         $validator = Validator::make($payload, [
@@ -90,6 +93,9 @@ class TelemetryIngestor
                 'status' => 'online',
                 'mqtt_status' => 'connected',
             ]);
+
+            $this->alerts->resolveOffline($device, $now);
+            $this->alerts->evaluateMeasurement($device, $measurement);
 
             return $measurement;
         });

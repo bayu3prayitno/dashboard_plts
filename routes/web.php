@@ -47,9 +47,9 @@ Route::middleware('auth')->group(function () {
     // Alerts Management
     Route::prefix('alerts')->name('alerts.')->group(function () {
         Route::get('/', [AlertController::class, 'index'])->name('index');
-        Route::post('/{id}/status', [AlertController::class, 'updateStatus'])->name('updateStatus');
+        Route::post('/{alert}/status', [AlertController::class, 'updateStatus'])->name('updateStatus');
         Route::get('/configuration', [AlertController::class, 'configuration'])->name('configuration');
-        Route::post('/threshold/{id}', [AlertController::class, 'updateThreshold'])->name('updateThreshold');
+        Route::post('/configuration', [AlertController::class, 'saveConfiguration'])->name('configuration.update');
     });
 
     // Historical Data & Reports

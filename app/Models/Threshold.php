@@ -11,6 +11,15 @@ class Threshold extends Model
 {
     public const SENSOR_TYPES = ['temperature', 'voltage', 'current', 'power', 'irradiance'];
 
+    /** Label dan satuan tiap sensor untuk tampilan. */
+    public const SENSOR_INFO = [
+        'temperature' => ['label' => 'Suhu', 'unit' => '°C'],
+        'voltage' => ['label' => 'Tegangan', 'unit' => 'V'],
+        'current' => ['label' => 'Arus', 'unit' => 'A'],
+        'power' => ['label' => 'Daya', 'unit' => 'W'],
+        'irradiance' => ['label' => 'Irradiance', 'unit' => 'W/m²'],
+    ];
+
     /**
      * Get the attributes that should be cast.
      *

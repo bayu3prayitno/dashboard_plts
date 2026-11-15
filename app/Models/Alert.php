@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
@@ -36,6 +37,12 @@ class Alert extends Model
         ];
     }
 
+    /** Alert yang belum diselesaikan (baru atau sedang ditangani). */
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query->where('status', '!=', self::STATUS_RESOLVED);
+    }
+
     public function device(): BelongsTo
     {
         return $this->belongsTo(Device::class);
@@ -45,5 +52,45 @@ class Alert extends Model
     public function handler(): BelongsTo
     {
         return $this->belongsTo(User::class, 'handled_by');
+    }
+
+    public function typeLabel(): string
+    {
+        return $this->alert_type === self::TYPE_OFFLINE ? 'Device Offline' : 'Threshold Breach';
+    }
+
+    public function statusLabel(): string
+    {
+        return match ($this->status) {
+            self::STATUS_NEW => 'Baru',
+            self::STATUS_ACKNOWLEDGED => 'Ditangani',
+            default => 'Selesai',
+        };
+    }
+
+    /** Pesan singkat untuk ditampilkan, disusun dari data alert. */
+    public function message(): string
+    {
+        if ($this->alert_type === self::TYPE_OFFLINE) {
+            return 'Perangkat tidak mengirim data melewati batas waktu offline';
+        }
+
+        $info = Threshold::SENSOR_INFO[$this->sensor_type] ?? ['label' => 'Nilai', 'unit' => ''];
+        $direction = $this->alert_type === self::TYPE_THRESHOLD_HIGH ? 'di atas' : 'di bawah';
+
+        return sprintf(
+            '%s %s%s %s ambang %s%s',
+            $info['label'],
+            self::formatNumber($this->recorded_value),
+            $info['unit'],
+            $direction,
+            self::formatNumber($this->threshold_value),
+            $info['unit'],
+        );
+    }
+
+    private static function formatNumber(mixed $value): string
+    {
+        return rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
     }
 }

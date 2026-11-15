@@ -5,28 +5,26 @@
 @section('page-subtitle', 'Atur parameter peringatan untuk semua perangkat')
 
 @section('content')
-<div class="space-y-6">
+<form method="POST" action="{{ route('alerts.configuration.update') }}" class="space-y-6">
+    @csrf
+
     <!-- Global Settings -->
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Pengaturan Global</h3>
-        <form method="POST" action="{{ route('alerts.configuration') }}" class="space-y-4">
-            @csrf
-
+        <div class="space-y-4">
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Offline Timeout (Menit)</label>
-                <input type="number" name="offline_timeout" value="{{ $offline_timeout }}" min="5" class="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="number" name="offline_timeout" value="{{ old('offline_timeout', $offlineTimeout) }}" min="5" max="1440" class="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                 <p class="text-xs text-gray-500 mt-1">Durasi sebelum perangkat dianggap offline (minimal 10-15 menit untuk toleransi 2-3 siklus pengiriman)</p>
+                @error('offline_timeout')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
             </div>
-
-            <div class="flex gap-3 pt-4">
-                <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Simpan Pengaturan</button>
-            </div>
-        </form>
+        </div>
     </div>
 
     <!-- Threshold Settings -->
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Ambang Batas Parameter Sensor</h3>
+        <p class="text-xs text-gray-500 mb-4">Berlaku untuk semua perangkat yang tidak memiliki ambang batas khusus.</p>
 
         <div class="overflow-x-auto">
             <table class="w-full">
@@ -36,22 +34,21 @@
                         <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Unit</th>
                         <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Min</th>
                         <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Max</th>
-                        <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
-                    @foreach($thresholds as $index => $threshold)
+                    @foreach($sensors as $sensor => $info)
+                    @php $current = $thresholds->get($sensor); @endphp
                     <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $threshold['parameter'] }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">{{ $threshold['unit'] }}</td>
+                        <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $info['label'] }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">{{ $info['unit'] }}</td>
                         <td class="px-6 py-4 text-center">
-                            <input type="number" step="0.1" value="{{ $threshold['min'] }}" class="w-24 px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="number" step="0.01" name="thresholds[{{ $sensor }}][min]" value="{{ old("thresholds.$sensor.min", $current?->min_value) }}" class="w-24 px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                            @error("thresholds.$sensor.min")<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <input type="number" step="0.1" value="{{ $threshold['max'] }}" class="w-24 px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            <button type="button" onclick="editThreshold({{ $index }})" class="text-blue-600 hover:text-blue-800 font-semibold text-sm">Edit</button>
+                            <input type="number" step="0.01" name="thresholds[{{ $sensor }}][max]" value="{{ old("thresholds.$sensor.max", $current?->max_value) }}" class="w-24 px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                            @error("thresholds.$sensor.max")<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
                         </td>
                     </tr>
                     @endforeach
@@ -60,8 +57,8 @@
         </div>
 
         <div class="mt-6 flex gap-3">
-            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Simpan Ambang Batas</button>
-            <button type="reset" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Reset</button>
+            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Simpan Konfigurasi</button>
+            <a href="{{ route('alerts.index') }}" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Batal</a>
         </div>
     </div>
 
@@ -80,7 +77,7 @@
 
             <div class="p-4 border-l-4 border-orange-500 bg-orange-50 rounded">
                 <h4 class="font-semibold text-gray-800">2. Device Offline</h4>
-                <p class="text-sm text-gray-600 mt-1">Peringatan dipicu ketika tidak ada data masuk dari perangkat melebihi durasi timeout yang telah diatur.</p>
+                <p class="text-sm text-gray-600 mt-1">Peringatan dipicu ketika tidak ada data masuk dari perangkat melebihi durasi timeout yang telah diatur. Alert otomatis ditutup saat perangkat kembali mengirim data.</p>
                 <div class="mt-2 text-xs text-gray-500">
                     <p>Contoh: Jika timeout = 15 menit dan tidak ada data selama 15 menit, alert "Device Offline" akan dipicu</p>
                 </div>
@@ -102,16 +99,9 @@
         <ul class="text-sm text-blue-800 space-y-1">
             <li>• Pastikan offline timeout minimal 10-15 menit untuk menghindari false alarm (toleransi 2-3 siklus beacon)</li>
             <li>• Ambang batas yang terlalu ketat dapat menyebabkan banyak false positive</li>
-            <li>• Setiap perubahan threshold akan dicatat dalam Audit Log</li>
+            <li>• Setiap perubahan ambang batas dan timeout dicatat dalam Audit Log</li>
             <li>• Alert dapat dipicu untuk satu atau lebih perangkat sekaligus</li>
         </ul>
     </div>
-</div>
-
-<script>
-function editThreshold(index) {
-    console.log('Edit threshold:', index);
-    // Implement edit modal or logic
-}
-</script>
+</form>
 @endsection

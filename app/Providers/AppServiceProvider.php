@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Http\Controllers\DashboardController;
+use App\Models\Alert;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -26,7 +27,7 @@ class AppServiceProvider extends ServiceProvider
         // Masih tiruan — ganti dengan query model saat backend siap.
         View::composer('layouts.app', function ($view) {
             $now = CarbonImmutable::now(DashboardController::TZ);
-            $alerts = DashboardController::mockAlerts($now);
+            $openAlerts = Alert::query()->open()->with('device:id,name')->latest('triggered_at')->get();
 
             $view->with([
                 // Halaman ber-layout ini selalu di balik middleware auth
@@ -35,8 +36,16 @@ class AppServiceProvider extends ServiceProvider
                     'role' => auth()->user()?->roleLabel() ?? '',
                     'super' => (bool) auth()->user()?->isSuperAdmin(),
                 ],
-                'layoutActiveAlerts' => count(array_filter($alerts, fn ($a) => $a['status'] !== 'selesai')),
-                'layoutFreshAlerts' => array_values(array_filter($alerts, fn ($a) => $a['status'] === 'baru')),
+                'layoutActiveAlerts' => $openAlerts->count(),
+                'layoutFreshAlerts' => $openAlerts
+                    ->where('status', Alert::STATUS_NEW)
+                    ->map(fn (Alert $a) => [
+                        'device' => $a->device?->name ?? '-',
+                        'text' => $a->message(),
+                        'waktu' => $a->triggered_at,
+                    ])
+                    ->values()
+                    ->all(),
                 'layoutDevices' => array_map(fn ($d) => [
                     'id' => $d['id'],
                     'nama' => $d['nama'],
