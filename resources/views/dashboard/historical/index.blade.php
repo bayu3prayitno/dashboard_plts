@@ -10,9 +10,7 @@
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Filter Data</h3>
 
-        <form method="POST" action="{{ route('historical.filter') }}" class="space-y-4">
-            @csrf
-
+        <form method="GET" action="{{ route('historical.index') }}" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <!-- Device Filter -->
                 <div>
@@ -20,7 +18,7 @@
                     <select name="device_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Semua Perangkat</option>
                         @foreach($devices as $device)
-                            <option value="{{ $device['id'] }}">{{ $device['name'] }}</option>
+                            <option value="{{ $device['id'] }}" @selected((string) $filters['device_id'] === (string) $device['id'])>{{ $device['name'] }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -31,7 +29,7 @@
                     <select name="sensor_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Semua Sensor</option>
                         @foreach($sensors as $key => $label)
-                            <option value="{{ $key }}">{{ $label }}</option>
+                            <option value="{{ $key }}" @selected($filters['sensor_type'] === $key)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -39,25 +37,29 @@
                 <!-- Date From -->
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Dari Tanggal</label>
-                    <input type="date" name="date_from" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="date" name="date_from" value="{{ $filters['date_from'] }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
 
                 <!-- Date To -->
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Sampai Tanggal</label>
-                    <input type="date" name="date_to" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="date" name="date_to" value="{{ $filters['date_to'] }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
             </div>
 
+            @if($errors->any())
+                <p class="text-sm text-red-600">{{ $errors->first() }}</p>
+            @endif
+
             <div class="flex gap-3">
                 <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Terapkan Filter</button>
-                <a href="{{ route('historical.exportCsv') }}" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2">
+                <a href="{{ route('historical.exportCsv', request()->query()) }}" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                     </svg>
                     Export CSV
                 </a>
-                <button type="reset" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">Reset</button>
+                <a href="{{ route('historical.index') }}" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400 flex items-center">Reset</a>
             </div>
         </form>
     </div>
@@ -98,6 +100,9 @@
                 </tbody>
             </table>
         </div>
+        @if($paginator->hasPages())
+            <div class="px-4 py-3 border-t border-gray-200">{{ $paginator->links() }}</div>
+        @endif
     </div>
 
     <!-- Chart Visualization -->
@@ -141,19 +146,19 @@
         <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div class="p-4 bg-gray-50 rounded">
                 <p class="text-gray-600 text-sm">Total Records</p>
-                <p class="text-2xl font-bold text-gray-800">{{ count($data) }}</p>
+                <p class="text-2xl font-bold text-gray-800">{{ number_format($stats['total'], 0, ',', '.') }}</p>
             </div>
             <div class="p-4 bg-gray-50 rounded">
                 <p class="text-gray-600 text-sm">Periode Data</p>
-                <p class="text-sm font-bold text-gray-800">{{ count($data) > 0 ? $data[0]['timestamp'] . ' - ' . end($data)['timestamp'] : '-' }}</p>
+                <p class="text-sm font-bold text-gray-800">{{ $stats['from'] ? $stats['from']->format('d/m/Y H:i') . ' - ' . $stats['to']->format('d/m/Y H:i') : '-' }}</p>
             </div>
             <div class="p-4 bg-gray-50 rounded">
-                <p class="text-gray-600 text-sm">Data Konsisten</p>
-                <p class="text-2xl font-bold text-green-600">{{ count($data) }}%</p>
+                <p class="text-gray-600 text-sm">Penerimaan Paket</p>
+                <p class="text-2xl font-bold text-green-600">{{ $stats['avg_packet_loss'] !== null ? number_format(100 - $stats['avg_packet_loss'], 1, ',', '.') : '-' }}%</p>
             </div>
             <div class="p-4 bg-gray-50 rounded">
-                <p class="text-gray-600 text-sm">Packet Loss</p>
-                <p class="text-2xl font-bold text-green-600">0%</p>
+                <p class="text-gray-600 text-sm">Rata-rata Packet Loss</p>
+                <p class="text-2xl font-bold text-gray-800">{{ $stats['avg_packet_loss'] !== null ? number_format($stats['avg_packet_loss'], 2, ',', '.') : '-' }}%</p>
             </div>
             <div class="p-4 bg-gray-50 rounded">
                 <p class="text-gray-600 text-sm">Format Export</p>

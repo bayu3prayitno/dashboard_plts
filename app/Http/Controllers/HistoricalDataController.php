@@ -2,121 +2,284 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\View\View;
+use App\Models\Device;
+use App\Models\Measurement;
+use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
+/**
+ * Data historis & laporan (PRD 4.3).
+ *
+ * Filter (perangkat, jenis sensor, rentang tanggal) dibaca dari query string sehingga
+ * bisa dibagikan lewat URL dan dipakai ulang oleh ekspor CSV dan data grafik.
+ * Tanggal filter diartikan dalam zona waktu dashboard (WIB).
+ */
 class HistoricalDataController extends Controller
 {
-    public function index(): View
+    public const SENSORS = [
+        'temperature' => 'Temperature (°C)',
+        'voltage' => 'Voltage (V)',
+        'current' => 'Current (A)',
+        'power' => 'Power (W)',
+        'irradiance' => 'Irradiance (W/m²)',
+    ];
+
+    private const SENSOR_COLORS = [
+        'temperature' => '#ef4444',
+        'voltage' => '#3b82f6',
+        'current' => '#f59e0b',
+        'power' => '#10b981',
+        'irradiance' => '#8b5cf6',
+    ];
+
+    /** Kolom ekspor CSV disusun mengikuti format kartu SD Gateway (PRD 5.3). */
+    private const CSV_HEADER = [
+        'Timestamp',
+        'Packet Number',
+        'Node ID',
+        'Device Name',
+        'Temperature (°C)',
+        'Voltage (V)',
+        'Current (A)',
+        'Power (W)',
+        'Irradiance (W/m²)',
+        'RSSI (dBm)',
+        'SNR (dB)',
+        'Packet Loss (%)',
+    ];
+
+    private const PER_PAGE = 25;
+
+    /** Batas titik pada grafik agar respons tetap ringan. */
+    private const CHART_MAX_POINTS = 500;
+
+    public function index(Request $request): View
     {
-        $devices = [
-            ['id' => 1, 'name' => 'Node Sensor 01'],
-            ['id' => 2, 'name' => 'Node Sensor 02'],
-            ['id' => 3, 'name' => 'Node Sensor 03'],
-        ];
-
-        $sensors = [
-            'temperature' => 'Temperature (°C)',
-            'voltage' => 'Voltage (V)',
-            'current' => 'Current (A)',
-            'power' => 'Power (W)',
-            'irradiance' => 'Irradiance (W/m²)',
-        ];
-
-        $data = [
-            [
-                'timestamp' => '2026-11-14 10:00:00',
-                'packet_number' => 1001,
-                'device_id' => 'DEVICE_001',
-                'device_name' => 'Node Sensor 01',
-                'temperature' => 28.5,
-                'voltage' => 220.5,
-                'current' => 5.2,
-                'power' => 1146.0,
-                'irradiance' => 850.0,
-            ],
-            [
-                'timestamp' => '2026-11-14 10:05:00',
-                'packet_number' => 1002,
-                'device_id' => 'DEVICE_001',
-                'device_name' => 'Node Sensor 01',
-                'temperature' => 28.7,
-                'voltage' => 220.3,
-                'current' => 5.3,
-                'power' => 1167.0,
-                'irradiance' => 855.0,
-            ],
-            [
-                'timestamp' => '2026-11-14 10:10:00',
-                'packet_number' => 1003,
-                'device_id' => 'DEVICE_001',
-                'device_name' => 'Node Sensor 01',
-                'temperature' => 28.9,
-                'voltage' => 220.2,
-                'current' => 5.4,
-                'power' => 1188.0,
-                'irradiance' => 860.0,
-            ],
-        ];
+        $filters = $this->validatedFilters($request);
+        $query = $this->filteredQuery($filters);
+        $page = $this->paginateRows($query);
 
         return view('dashboard.historical.index', [
-            'devices' => $devices,
-            'sensors' => $sensors,
-            'data' => $data,
+            'devices' => $this->deviceOptions(),
+            'sensors' => self::SENSORS,
+            'data' => $page->getCollection()->map(fn (Measurement $m) => $this->toRow($m))->all(),
+            'paginator' => $page,
+            'stats' => $this->stats($query),
+            'filters' => $filters,
         ]);
     }
 
-    public function filter(): JsonResponse
+    /** Hasil filter dalam bentuk JSON (halaman per 25 baris). */
+    public function filter(Request $request): JsonResponse
     {
-        $data = [
-            [
-                'timestamp' => '2026-11-14 10:00:00',
-                'packet_number' => 1001,
-                'device_name' => 'Node Sensor 01',
-                'temperature' => 28.5,
-                'voltage' => 220.5,
-                'current' => 5.2,
-                'power' => 1146.0,
-                'irradiance' => 850.0,
+        $filters = $this->validatedFilters($request);
+        $page = $this->paginateRows($this->filteredQuery($filters));
+
+        return response()->json([
+            'data' => $page->getCollection()->map(fn (Measurement $m) => $this->toRow($m))->values(),
+            'meta' => [
+                'current_page' => $page->currentPage(),
+                'last_page' => $page->lastPage(),
+                'total' => $page->total(),
             ],
-        ];
-
-        return response()->json($data);
-    }
-
-    public function exportCsv(): StreamedResponse
-    {
-        $csv = "Timestamp,Packet Number,Device ID,Temperature (°C),Voltage (V),Current (A),Power (W),Irradiance (W/m²)\n";
-        $csv .= "2026-11-14 10:00:00,1001,DEVICE_001,28.5,220.5,5.2,1146.0,850.0\n";
-        $csv .= "2026-11-14 10:05:00,1002,DEVICE_001,28.7,220.3,5.3,1167.0,855.0\n";
-        $csv .= "2026-11-14 10:10:00,1003,DEVICE_001,28.9,220.2,5.4,1188.0,860.0\n";
-
-        return response()->streamDownload(function () use ($csv) {
-            echo $csv;
-        }, 'sensor_data_' . date('Y-m-d_H-i-s') . '.csv', [
-            'Content-Type' => 'text/csv',
         ]);
     }
 
-    public function getChartData(): JsonResponse
+    /** Ekspor semua baris yang sesuai filter, urut waktu naik. */
+    public function exportCsv(Request $request): StreamedResponse
     {
-        $data = [
-            'labels' => ['10:00', '10:05', '10:10', '10:15', '10:20'],
-            'datasets' => [
-                [
-                    'label' => 'Temperature (°C)',
-                    'data' => [28.5, 28.7, 28.9, 29.1, 28.8],
-                    'borderColor' => '#ef4444',
-                ],
-                [
-                    'label' => 'Voltage (V)',
-                    'data' => [220.5, 220.3, 220.2, 220.1, 220.4],
-                    'borderColor' => '#3b82f6',
-                ],
-            ],
-        ];
+        $query = $this->filteredQuery($this->validatedFilters($request))
+            ->with('device:id,name,node_id')
+            ->orderBy('recorded_at');
 
-        return response()->json($data);
+        $filename = 'sensor_data_'.CarbonImmutable::now(DashboardController::TZ)->format('Y-m-d_H-i-s').'.csv';
+
+        return response()->streamDownload(function () use ($query) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8 dengan benar
+            fputcsv($out, self::CSV_HEADER);
+
+            foreach ($query->lazy(500) as $m) {
+                fputcsv($out, [
+                    $this->localTimestamp($m),
+                    $m->packet_no,
+                    $m->device?->node_id,
+                    $m->device?->name,
+                    (float) $m->temperature,
+                    (float) $m->voltage,
+                    (float) $m->current,
+                    (float) $m->power,
+                    (float) $m->irradiance,
+                    $m->rssi,
+                    (float) $m->snr,
+                    (float) $m->packet_loss,
+                ]);
+            }
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * Data grafik: rata-rata per waktu rekam (lintas perangkat bila perangkat tidak difilter).
+     * Jenis sensor memilih seri yang dikembalikan; kosong berarti semua sensor.
+     */
+    public function getChartData(Request $request): JsonResponse
+    {
+        $filters = $this->validatedFilters($request);
+
+        $selectSql = 'recorded_at';
+        foreach (array_keys(self::SENSORS) as $key) {
+            $selectSql .= ", AVG({$key}) as {$key}";
+        }
+
+        $rows = $this->filteredQuery($filters)
+            ->toBase()
+            ->selectRaw($selectSql)
+            ->groupBy('recorded_at')
+            ->orderByDesc('recorded_at')
+            ->limit(self::CHART_MAX_POINTS)
+            ->get()
+            ->reverse()
+            ->values();
+
+        $sensorKeys = $filters['sensor_type'] ? [$filters['sensor_type']] : array_keys(self::SENSORS);
+
+        return response()->json([
+            'labels' => $rows->map(fn ($r) => Carbon::parse($r->recorded_at, 'UTC')
+                ->timezone(DashboardController::TZ)
+                ->format('d/m H:i'))->all(),
+            'datasets' => array_map(fn (string $key) => [
+                'label' => self::SENSORS[$key],
+                'sensor' => $key,
+                'data' => $rows->map(fn ($r) => $r->{$key} !== null ? round((float) $r->{$key}, 2) : null)->all(),
+                'borderColor' => self::SENSOR_COLORS[$key],
+            ], $sensorKeys),
+            'meta' => [
+                'points' => $rows->count(),
+                'limit' => self::CHART_MAX_POINTS,
+            ],
+        ]);
+    }
+
+    /** @return array{device_id: ?int, sensor_type: ?string, date_from: ?string, date_to: ?string} */
+    private function validatedFilters(Request $request): array
+    {
+        $validated = $request->validate([
+            'device_id' => ['nullable', 'integer', 'exists:devices,id'],
+            'sensor_type' => ['nullable', 'string', Rule::in(array_keys(self::SENSORS))],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
+
+        return [
+            'device_id' => isset($validated['device_id']) ? (int) $validated['device_id'] : null,
+            'sensor_type' => $validated['sensor_type'] ?? null,
+            'date_from' => $validated['date_from'] ?? null,
+            'date_to' => $validated['date_to'] ?? null,
+        ];
+    }
+
+    /** Query dasar yang dipakai bersama oleh tabel, statistik, grafik, dan ekspor. */
+    private function filteredQuery(array $filters): Builder
+    {
+        $query = Measurement::query();
+
+        if ($filters['device_id'] !== null) {
+            $query->where('device_id', $filters['device_id']);
+        }
+
+        // recorded_at disimpan dalam zona waktu aplikasi (UTC), jadi batas harinya dikonversi dulu.
+        if ($filters['date_from'] !== null) {
+            $query->where('recorded_at', '>=', $this->localDayStart($filters['date_from']));
+        }
+
+        if ($filters['date_to'] !== null) {
+            $query->where('recorded_at', '<', $this->localDayStart($filters['date_to'], 1));
+        }
+
+        return $query;
+    }
+
+    private function paginateRows(Builder $query): LengthAwarePaginator
+    {
+        return (clone $query)
+            ->with('device:id,name,node_id')
+            ->orderByDesc('recorded_at')
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
+    }
+
+    /** Ringkasan untuk kartu statistik di bawah tabel. */
+    private function stats(Builder $query): array
+    {
+        $row = (clone $query)->toBase()
+            ->selectRaw('COUNT(*) as total, MIN(recorded_at) as first_at, MAX(recorded_at) as last_at, AVG(packet_loss) as avg_loss')
+            ->first();
+
+        return [
+            'total' => (int) $row->total,
+            'from' => $row->first_at ? $this->fromUtc($row->first_at) : null,
+            'to' => $row->last_at ? $this->fromUtc($row->last_at) : null,
+            'avg_packet_loss' => $row->avg_loss !== null ? round((float) $row->avg_loss, 2) : null,
+        ];
+    }
+
+    /** @return array<int, array{id: int, name: string}> */
+    private function deviceOptions(): array
+    {
+        return Device::orderBy('node_id')
+            ->get(['id', 'name'])
+            ->map(fn (Device $d) => ['id' => $d->id, 'name' => $d->name])
+            ->all();
+    }
+
+    /** Baris tabel; kunci array mengikuti yang dipakai view historical/index. */
+    private function toRow(Measurement $m): array
+    {
+        return [
+            'timestamp' => $this->localTimestamp($m),
+            'packet_number' => $m->packet_no,
+            'device_id' => $m->device_id,
+            'device_name' => $m->device?->name ?? '-',
+            'node_id' => $m->device?->node_id,
+            'temperature' => (float) $m->temperature,
+            'voltage' => (float) $m->voltage,
+            'current' => (float) $m->current,
+            'power' => (float) $m->power,
+            'irradiance' => (float) $m->irradiance,
+            'rssi' => $m->rssi,
+            'snr' => (float) $m->snr,
+            'packet_loss' => (float) $m->packet_loss,
+        ];
+    }
+
+    private function localTimestamp(Measurement $m): string
+    {
+        return $m->recorded_at->timezone(DashboardController::TZ)->format('Y-m-d H:i:s');
+    }
+
+    /** Awal hari (zona WIB) dalam format UTC untuk dibandingkan dengan kolom recorded_at. */
+    private function localDayStart(string $date, int $addDays = 0): string
+    {
+        return CarbonImmutable::createFromFormat('Y-m-d', $date, DashboardController::TZ)
+            ->addDays($addDays)
+            ->startOfDay()
+            ->utc()
+            ->format('Y-m-d H:i:s');
+    }
+
+    private function fromUtc(string $value): CarbonImmutable
+    {
+        return CarbonImmutable::parse($value, 'UTC')->timezone(DashboardController::TZ);
     }
 }
