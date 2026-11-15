@@ -31,7 +31,11 @@ class DeviceController extends Controller
 
     public function create(): View
     {
-        return view('dashboard.devices.create', ['gateways' => Gateway::orderBy('name')->get()]);
+        return view('dashboard.devices.create', [
+            'gateways' => Gateway::orderBy('name')->get(),
+            // ID Node berikutnya, supaya pengguna tidak perlu menebak nomor yang belum dipakai
+            'nextNodeId' => (int) Device::max('node_id') + 1,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -42,7 +46,9 @@ class DeviceController extends Controller
         $device = Device::create($data);
         ActivityLog::record($request->user()?->id, 'device.created', $device, null, $device->getAttributes());
 
-        return redirect()->route('devices.index')->with('success', 'Perangkat berhasil ditambahkan.');
+        // Langsung ke halaman detail, tempat konfigurasi firmware ditampilkan
+        return redirect()->route('devices.show', $device)
+            ->with('success', 'Perangkat berhasil ditambahkan. Salin konfigurasi firmware di bawah ke program Node.');
     }
 
     public function edit(Device $device): View

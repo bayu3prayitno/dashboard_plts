@@ -13,8 +13,8 @@
             <!-- Node ID -->
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">ID Node</label>
-                <input type="number" name="node_id" min="1" value="{{ old('node_id') }}" placeholder="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                <p class="text-xs text-gray-500 mt-1">ID Node sesuai firmware (sesuai dengan firmware Node)</p>
+                <input type="number" name="node_id" min="1" value="{{ old('node_id', $nextNodeId) }}" placeholder="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                <p class="text-xs text-gray-500 mt-1">Terisi otomatis dengan nomor berikutnya. Nilai ini nanti dimasukkan ke firmware Node setelah perangkat disimpan.</p>
                 @error('node_id')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
             </div>
 

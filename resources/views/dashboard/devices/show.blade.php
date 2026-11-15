@@ -105,6 +105,47 @@
         </div>
     </div>
 
+    <!-- Konfigurasi Firmware -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800">Konfigurasi Firmware Node</h3>
+                <p class="text-sm text-gray-500">Masukkan nilai berikut ke program perangkat agar datanya dikenali sistem.</p>
+            </div>
+            @if($device->gateway)
+                <button type="button" onclick="copyFirmwareConfig()" class="shrink-0 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">Salin</button>
+            @endif
+        </div>
+
+        @if($device->gateway)
+            @php
+                $samplePayload = [
+                    'node_id' => $device->node_id,
+                    'packet_no' => 1,
+                    'temperature' => 28.5,
+                    'voltage' => 12.1,
+                    'current' => 1.2,
+                    'power' => 14.5,
+                    'irradiance' => 650,
+                    'rssi' => -72,
+                    'snr' => 8.5,
+                    'packet_loss' => 0,
+                ];
+            @endphp
+            <div id="firmware-config" class="space-y-2 font-mono text-sm">
+                <div class="flex justify-between gap-4 p-3 bg-gray-50 rounded"><span class="text-gray-600">NODE_ID</span><span class="text-gray-900">{{ $device->node_id }}</span></div>
+                <div class="flex justify-between gap-4 p-3 bg-gray-50 rounded"><span class="text-gray-600">GATEWAY_CODE</span><span class="text-gray-900">{{ $device->gateway->gateway_code }}</span></div>
+                <div class="flex justify-between gap-4 p-3 bg-gray-50 rounded"><span class="text-gray-600">MQTT_TOPIC</span><span class="text-gray-900 break-all text-right">{{ $device->gateway->mqttDataTopic() }}</span></div>
+            </div>
+
+            <p class="text-sm text-gray-700 mt-6 mb-2">Format pesan JSON yang dikirim Node (nilai contoh):</p>
+            <pre class="bg-gray-900 text-green-300 text-xs p-4 rounded overflow-x-auto">{{ json_encode($samplePayload, JSON_PRETTY_PRINT) }}</pre>
+            <p class="text-xs text-gray-500 mt-2">Kolom <span class="font-mono">node_id</span> harus sama dengan NODE_ID di atas. <span class="font-mono">packet_no</span> harus bertambah untuk setiap paket.</p>
+        @else
+            <p class="text-sm text-gray-500">Perangkat belum terhubung ke Gateway. Edit perangkat dan pilih Gateway untuk melihat konfigurasi.</p>
+        @endif
+    </div>
+
     <!-- Historical Data Charts (belum dihubungkan ke data) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white rounded-lg shadow p-6">
@@ -139,6 +180,13 @@
 </div>
 
 <script>
+function copyFirmwareConfig() {
+    const text = document.getElementById('firmware-config')?.innerText ?? '';
+    navigator.clipboard.writeText(text)
+        .then(() => showToast('Konfigurasi disalin.', 'success'))
+        .catch(() => showToast('Gagal menyalin. Salin secara manual.', 'error'));
+}
+
 async function deleteDevice(id) {
     if (!confirm('Apakah Anda yakin ingin menghapus perangkat ini?')) return;
 
