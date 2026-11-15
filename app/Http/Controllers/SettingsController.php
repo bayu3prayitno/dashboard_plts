@@ -2,11 +2,29 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\View\View;
+use App\Models\ActivityLog;
+use App\Models\Setting;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class SettingsController extends Controller
 {
+    private const PER_PAGE = 20;
+
+    /** Pengaturan sistem yang disimpan di tabel settings, dengan nilai default dan keterangan. */
+    private const SYSTEM_KEYS = [
+        'timezone' => ['default' => 'Asia/Jakarta', 'description' => 'Zona waktu untuk tampilan dan filter data'],
+        'data_retention_days' => ['default' => '90', 'description' => 'Lama data sensor disimpan (hari)'],
+        'offline_timeout_minutes' => ['default' => '15', 'description' => 'Durasi (menit) sebelum perangkat dianggap offline'],
+        'beacon_interval_minutes' => ['default' => '5', 'description' => 'Interval beacon Gateway (menit), diatur di firmware'],
+    ];
+
+    private const TIMEZONES = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura', 'UTC'];
+
     public function index(): View
     {
         return view('dashboard.settings.index');
@@ -14,78 +32,77 @@ class SettingsController extends Controller
 
     public function users(): View
     {
-        $users = [
-            [
-                'id' => 1,
-                'name' => 'Super Admin',
-                'email' => 'superadmin@example.com',
-                'role' => 'Super Admin',
-                'status' => 'active',
-                'created_at' => '2026-01-15',
-            ],
-            [
-                'id' => 2,
-                'name' => 'Admin Lokasi A',
-                'email' => 'admin.a@example.com',
-                'role' => 'Admin',
-                'status' => 'active',
-                'assigned_locations' => ['Lokasi A'],
-                'created_at' => '2026-02-01',
-            ],
-        ];
-
-        return view('dashboard.settings.users', ['users' => $users]);
+        return view('dashboard.settings.users', [
+            'users' => User::query()->orderBy('name')->get(),
+        ]);
     }
 
     public function systemSettings(): View
     {
-        $settings = [
-            'timezone' => 'Asia/Jakarta',
-            'data_retention_days' => 90,
-            'offline_timeout_minutes' => 15,
-            'beacon_interval_minutes' => 5,
-            'mqtt_broker_url' => 'mqtt://broker.example.com',
-            'mqtt_username' => 'admin',
-        ];
-
-        return view('dashboard.settings.system', ['settings' => $settings]);
+        return view('dashboard.settings.system', ['settings' => $this->currentSystemSettings()]);
     }
 
-    public function updateSystemSettings(): JsonResponse
+    /** Simpan pengaturan sistem. Perubahan setiap nilai dicatat di audit log. */
+    public function updateSystemSettings(Request $request): RedirectResponse
     {
-        return response()->json([
-            'success' => true,
-            'message' => 'System settings updated successfully',
+        $data = $request->validate([
+            'timezone' => ['required', Rule::in(self::TIMEZONES)],
+            'data_retention_days' => ['required', 'integer', 'min:30', 'max:3650'],
+            'offline_timeout_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
         ]);
+
+        $before = $this->currentSystemSettings();
+        $userId = $request->user()?->id;
+
+        foreach ($data as $key => $value) {
+            $value = (string) ($value ?? '');
+            if ($before[$key] === $value) {
+                continue;
+            }
+
+            $setting = Setting::updateOrCreate(
+                ['key' => $key],
+                ['value' => $value, 'description' => self::SYSTEM_KEYS[$key]['description']],
+            );
+
+            ActivityLog::record($userId, 'setting.updated', $setting, [$key => $before[$key]], [$key => $value]);
+        }
+
+        return redirect()->route('settings.system')->with('success', 'Pengaturan sistem disimpan.');
     }
 
-    public function auditLog(): View
+    /** Audit log dengan filter pencarian dan pengguna, serta ringkasan jumlah aktivitas. */
+    public function auditLog(Request $request): View
     {
-        $logs = [
-            [
-                'id' => 1,
-                'user' => 'Super Admin',
-                'action' => 'Created Device',
-                'details' => 'Created new device DEVICE_001',
-                'timestamp' => '2026-11-14 09:30:00',
-            ],
-            [
-                'id' => 2,
-                'user' => 'Admin Lokasi A',
-                'action' => 'Updated Threshold',
-                'details' => 'Updated temperature threshold: 35°C',
-                'timestamp' => '2026-11-14 09:15:00',
-            ],
-            [
-                'id' => 3,
-                'user' => 'Super Admin',
-                'action' => 'Assigned Scope',
-                'details' => 'Assigned Lokasi A to Admin Lokasi A',
-                'timestamp' => '2026-11-13 14:20:00',
-            ],
-        ];
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
 
-        return view('dashboard.settings.audit', ['logs' => $logs]);
+        $query = ActivityLog::query()->with('user:id,name')->latest('created_at');
+
+        if (! empty($filters['q'])) {
+            $term = '%'.$filters['q'].'%';
+            $query->where(fn ($q) => $q->where('action', 'like', $term)->orWhere('subject_type', 'like', $term));
+        }
+
+        if (! empty($filters['user_id'])) {
+            $query->where('user_id', $filters['user_id']);
+        }
+
+        $now = now();
+
+        return view('dashboard.settings.audit', [
+            'logs' => $query->paginate(self::PER_PAGE)->withQueryString(),
+            'filters' => ['q' => $filters['q'] ?? '', 'user_id' => $filters['user_id'] ?? null],
+            'users' => User::query()->orderBy('name')->get(['id', 'name']),
+            'stats' => [
+                'total' => ActivityLog::count(),
+                'today' => ActivityLog::where('created_at', '>=', $now->copy()->startOfDay())->count(),
+                'week' => ActivityLog::where('created_at', '>=', $now->copy()->startOfWeek())->count(),
+                'month' => ActivityLog::where('created_at', '>=', $now->copy()->startOfMonth())->count(),
+            ],
+        ]);
     }
 
     public function scopeAssignment(): View
@@ -120,5 +137,15 @@ class SettingsController extends Controller
             'success' => true,
             'message' => 'Scope assignment updated successfully',
         ]);
+    }
+
+    /** Nilai pengaturan sistem saat ini: dari tabel settings, atau default bila belum pernah disimpan. */
+    private function currentSystemSettings(): array
+    {
+        $stored = Setting::query()->whereIn('key', array_keys(self::SYSTEM_KEYS))->pluck('value', 'key');
+
+        return collect(self::SYSTEM_KEYS)
+            ->map(fn (array $meta, string $key) => (string) ($stored[$key] ?? $meta['default']))
+            ->all();
     }
 }

@@ -31,7 +31,7 @@
             </div>
             <h3 class="text-lg font-semibold text-gray-800 ml-3">Pengaturan Sistem</h3>
         </div>
-        <p class="text-gray-600 text-sm">Konfigurasi timezone, data retention, MQTT settings</p>
+        <p class="text-gray-600 text-sm">Konfigurasi timezone, data retention, dan offline timeout</p>
         <div class="mt-4 text-blue-600 font-semibold text-sm">→ Buka</div>
     </a>
 

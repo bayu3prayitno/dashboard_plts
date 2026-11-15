@@ -30,27 +30,33 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-                @foreach($users as $user)
+                @forelse($users as $user)
                 <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $user['name'] }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $user['email'] }}</td>
+                    <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $user->name }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">{{ $user->email }}</td>
                     <td class="px-6 py-4 text-sm">
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium @if($user['role'] === 'Super Admin') bg-red-100 text-red-800 @else bg-blue-100 text-blue-800 @endif">
-                            {{ $user['role'] }}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium @if($user->isSuperAdmin()) bg-red-100 text-red-800 @else bg-blue-100 text-blue-800 @endif">
+                            {{ $user->roleLabel() }}
                         </span>
                     </td>
                     <td class="px-6 py-4 text-sm">
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                            {{ $user['status'] }}
-                        </span>
+                        @if($user->is_active)
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">Aktif</span>
+                        @else
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">Nonaktif</span>
+                        @endif
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $user['created_at'] }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">{{ $user->created_at->format('Y-m-d') }}</td>
                     <td class="px-6 py-4 text-sm">
                         <button class="text-blue-600 hover:text-blue-800 font-semibold mr-3">Edit</button>
                         <button class="text-red-600 hover:text-red-800 font-semibold">Hapus</button>
                     </td>
                 </tr>
-                @endforeach
+                @empty
+                <tr>
+                    <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500">Belum ada user.</td>
+                </tr>
+                @endforelse
             </tbody>
         </table>
     </div>
