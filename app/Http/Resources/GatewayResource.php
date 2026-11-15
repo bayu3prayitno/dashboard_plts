@@ -17,7 +17,6 @@ class GatewayResource extends JsonResource
             'id' => $this->id,
             'gateway_code' => $this->gateway_code,
             'name' => $this->name,
-            'location' => $this->location,
             'status' => $this->status,
             'mqtt_status' => $this->mqtt_status,
             'internet_status' => $this->internet_status,

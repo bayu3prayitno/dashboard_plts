@@ -40,7 +40,6 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nama Gateway</th>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Kode</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Lokasi</th>
                     <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Status Koneksi</th>
                     <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">MQTT</th>
                     <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Internet</th>
@@ -54,7 +53,6 @@
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $gateway->name }}</td>
                     <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ $gateway->gateway_code }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $gateway->location }}</td>
                     <td class="px-6 py-4 text-center"><x-status-badge :status="$gateway->status" /></td>
                     <td class="px-6 py-4 text-center"><x-status-badge :status="$gateway->mqtt_status" /></td>
                     <td class="px-6 py-4 text-center"><x-status-badge :status="$gateway->internet_status" /></td>
@@ -66,7 +64,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500">Belum ada gateway terdaftar.</td>
+                    <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">Belum ada gateway terdaftar.</td>
                 </tr>
                 @endforelse
             </tbody>

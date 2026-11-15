@@ -60,10 +60,6 @@
                     <dt class="shrink-0 text-muted">Kode Gateway</dt>
                     <dd class="text-right font-medium break-all">{{ $gateway->gateway_code }}</dd>
                 </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="shrink-0 text-muted">Lokasi</dt>
-                    <dd class="text-right font-medium break-all">{{ $gateway->location }}</dd>
-                </div>
             </dl>
         </section>
 

@@ -43,7 +43,6 @@ class GatewayController extends Controller
         // Kode gateway dibuat otomatis oleh model Gateway
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'location' => ['required', 'string', 'max:255'],
         ]);
 
         // Status koneksi diperbarui oleh sistem (MQTT subscriber), bukan oleh pengguna
@@ -71,7 +70,6 @@ class GatewayController extends Controller
 
         $gateway->update($request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'location' => ['required', 'string', 'max:255'],
         ]));
 
         ActivityLog::record($request->user()?->id, 'gateway.updated', $gateway, $before, $gateway->getAttributes());

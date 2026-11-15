@@ -33,7 +33,6 @@ class GatewayApiController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'location' => ['required', 'string', 'max:255'],
         ]);
 
         // Status awal dan kode gateway dibuat oleh sistem
@@ -55,7 +54,6 @@ class GatewayApiController extends Controller
 
         $gateway->update($request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'location' => ['required', 'string', 'max:255'],
         ]));
 
         ActivityLog::record($request->user()?->id, 'gateway.updated', $gateway, $before, $gateway->getAttributes());

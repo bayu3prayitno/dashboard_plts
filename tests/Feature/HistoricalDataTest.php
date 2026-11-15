@@ -27,7 +27,6 @@ class HistoricalDataTest extends TestCase
 
         $gateway = Gateway::create([
             'name' => 'Gateway Test',
-            'location' => 'Lokasi A',
             'status' => 'offline',
             'mqtt_status' => 'disconnected',
             'internet_status' => 'disconnected',

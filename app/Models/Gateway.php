@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
-#[Fillable(['name', 'location', 'status', 'mqtt_status', 'internet_status', 'last_seen_at'])]
+#[Fillable(['name', 'status', 'mqtt_status', 'internet_status', 'last_seen_at'])]
 class Gateway extends Model
 {
     protected static function booted(): void

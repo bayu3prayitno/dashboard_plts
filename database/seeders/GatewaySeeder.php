@@ -8,13 +8,13 @@ use Illuminate\Database\Seeder;
 class GatewaySeeder extends Seeder
 {
     /**
-     * Data awal gateway. Nama dan lokasi bersifat contoh (sama dengan data tiruan di dashboard),
-     * silakan sesuaikan dengan lokasi lapangan. Kode gateway dibuat otomatis oleh model.
+     * Data awal gateway. Nama bersifat contoh, silakan sesuaikan.
+     * Kode gateway dibuat otomatis oleh model.
      */
     public function run(): void
     {
         $gateways = [
-            ['name' => 'Gateway 01', 'location' => 'Politeknik Negeri Semarang'],
+            ['name' => 'Gateway 01'],
         ];
 
         foreach ($gateways as $gateway) {
@@ -22,7 +22,6 @@ class GatewaySeeder extends Seeder
             Gateway::firstOrCreate(
                 ['name' => $gateway['name']],
                 [
-                    'location' => $gateway['location'],
                     'status' => 'offline',
                     'mqtt_status' => 'disconnected',
                     'internet_status' => 'disconnected',
