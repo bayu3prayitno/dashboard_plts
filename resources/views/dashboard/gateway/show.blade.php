@@ -40,7 +40,7 @@
             <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="clock" :size="16" /> Komunikasi terakhir</div>
             <p class="mt-3 text-xl font-semibold">{{ Format::relTime($gateway->last_seen_at) }}</p>
             @if($gateway->last_seen_at)
-                <p class="mt-2 text-xs text-muted">{{ $gateway->last_seen_at->translatedFormat('d M Y, H:i') }} WIB</p>
+                <p class="mt-2 text-xs text-muted">{{ $gateway->last_seen_at->timezone(\App\Http\Controllers\DashboardController::tz())->translatedFormat('d M Y, H:i') }} {{ \App\Http\Controllers\DashboardController::tz() }}</p>
             @endif
         </section>
     </div>

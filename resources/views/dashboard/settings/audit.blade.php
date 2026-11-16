@@ -39,7 +39,7 @@
                         </span>
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-600">{{ $log->details() }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ $log->created_at->timezone(\App\Http\Controllers\DashboardController::TZ)->format('d M Y H:i:s') }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ $log->created_at->timezone(\App\Http\Controllers\DashboardController::tz())->format('d M Y H:i:s') }}</td>
                 </tr>
                 @empty
                 <tr>

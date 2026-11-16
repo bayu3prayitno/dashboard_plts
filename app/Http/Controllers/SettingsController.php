@@ -23,7 +23,7 @@ class SettingsController extends Controller
         'beacon_interval_minutes' => ['default' => '5', 'description' => 'Interval beacon Gateway (menit), diatur di firmware'],
     ];
 
-    private const TIMEZONES = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura', 'UTC'];
+    public const TIMEZONES = ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura', 'UTC'];
 
     public function index(): View
     {

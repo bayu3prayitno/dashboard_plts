@@ -38,7 +38,7 @@ class DeviceController extends Controller
      */
     private function trend24h(Device $device): array
     {
-        $now = CarbonImmutable::now(DashboardController::TZ);
+        $now = CarbonImmutable::now(DashboardController::tz());
         $currentBucket = $now->setMinute($now->minute >= 30 ? 30 : 0)->startOfMinute();
         $start = $currentBucket->subMinutes(30 * 47);
 
@@ -48,7 +48,7 @@ class DeviceController extends Controller
 
         $groups = [];
         foreach ($rows as $row) {
-            $t = $row->recorded_at->timezone(DashboardController::TZ);
+            $t = $row->recorded_at->timezone(DashboardController::tz());
             $groups[$t->format('Y-m-d H').'|'.($t->minute >= 30 ? 1 : 0)][] = $row;
         }
 

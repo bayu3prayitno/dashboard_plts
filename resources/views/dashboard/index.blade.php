@@ -162,7 +162,7 @@
                                         <a href="{{ route('devices.show', $d['id']) }}" class="font-medium hover:underline">{{ $d['nama'] }}</a>
                                         <div class="mt-1 flex flex-wrap items-center gap-2">
                                             <x-status-badge :status="$d['status']" />
-                                            <span class="text-xs whitespace-nowrap text-muted" title="{{ $d['last_seen'] ? $d['last_seen']->timezone(\App\Http\Controllers\DashboardController::TZ)->translatedFormat('d M Y H:i').' WIB' : 'Belum pernah mengirim data' }}">{{ Format::relTime($d['last_seen']) }}</span>
+                                            <span class="text-xs whitespace-nowrap text-muted" title="{{ $d['last_seen'] ? $d['last_seen']->timezone(\App\Http\Controllers\DashboardController::tz())->translatedFormat('d M Y H:i').' WIB' : 'Belum pernah mengirim data' }}">{{ Format::relTime($d['last_seen']) }}</span>
                                         </div>
                                     </td>
                                     @foreach ($sensors as $key => $s)

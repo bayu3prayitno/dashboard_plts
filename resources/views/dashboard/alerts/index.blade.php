@@ -70,7 +70,7 @@
                             <span class="block text-xs text-gray-500 mt-1">{{ $alert->resolution_note }}</span>
                         @endif
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ $alert->triggered_at->timezone(\App\Http\Controllers\DashboardController::TZ)->format('d M Y H:i') }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ $alert->triggered_at->timezone(\App\Http\Controllers\DashboardController::tz())->format('d M Y H:i') }}</td>
                 </tr>
                 @empty
                 <tr>

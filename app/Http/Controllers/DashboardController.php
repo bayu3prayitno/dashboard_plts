@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Alert;
 use App\Models\Device;
 use App\Models\Gateway;
+use App\Models\Setting;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,13 @@ use Illuminate\View\View;
  */
 class DashboardController extends Controller
 {
-    public const TZ = 'Asia/Jakarta';
+    /** Zona waktu tampilan dari pengaturan sistem (default Asia/Jakarta). Penyimpanan tetap UTC. */
+    public static function tz(): string
+    {
+        $value = Setting::find('timezone')?->value;
+
+        return in_array($value, SettingsController::TIMEZONES, true) ? $value : 'Asia/Jakarta';
+    }
 
     public const SENSORS = [
         'temperature' => ['label' => 'Suhu', 'unit' => '°C', 'digits' => 1],
@@ -40,7 +47,7 @@ class DashboardController extends Controller
 
     public function index(): View
     {
-        $now = CarbonImmutable::now(self::TZ);
+        $now = CarbonImmutable::now(self::tz());
         $offlineMinutes = Device::offlineTimeoutMinutes();
 
         $latest = $this->latestMeasurements();

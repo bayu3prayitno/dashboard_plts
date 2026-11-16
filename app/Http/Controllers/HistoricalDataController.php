@@ -99,7 +99,7 @@ class HistoricalDataController extends Controller
             ->with('device:id,name,node_id')
             ->orderBy('recorded_at');
 
-        $filename = 'sensor_data_'.CarbonImmutable::now(DashboardController::TZ)->format('Y-m-d_H-i-s').'.csv';
+        $filename = 'sensor_data_'.CarbonImmutable::now(DashboardController::tz())->format('Y-m-d_H-i-s').'.csv';
 
         return response()->streamDownload(function () use ($query) {
             $out = fopen('php://output', 'w');
@@ -156,7 +156,7 @@ class HistoricalDataController extends Controller
 
         return response()->json([
             'labels' => $rows->map(fn ($r) => Carbon::parse($r->recorded_at, 'UTC')
-                ->timezone(DashboardController::TZ)
+                ->timezone(DashboardController::tz())
                 ->format('d/m H:i'))->all(),
             'datasets' => array_map(fn (string $key) => [
                 'label' => self::SENSORS[$key],
@@ -265,13 +265,13 @@ class HistoricalDataController extends Controller
 
     private function localTimestamp(Measurement $m): string
     {
-        return $m->recorded_at->timezone(DashboardController::TZ)->format('Y-m-d H:i:s');
+        return $m->recorded_at->timezone(DashboardController::tz())->format('Y-m-d H:i:s');
     }
 
     /** Awal hari (zona WIB) dalam format UTC untuk dibandingkan dengan kolom recorded_at. */
     private function localDayStart(string $date, int $addDays = 0): string
     {
-        return CarbonImmutable::createFromFormat('Y-m-d', $date, DashboardController::TZ)
+        return CarbonImmutable::createFromFormat('Y-m-d', $date, DashboardController::tz())
             ->addDays($addDays)
             ->startOfDay()
             ->utc()
@@ -280,6 +280,6 @@ class HistoricalDataController extends Controller
 
     private function fromUtc(string $value): CarbonImmutable
     {
-        return CarbonImmutable::parse($value, 'UTC')->timezone(DashboardController::TZ);
+        return CarbonImmutable::parse($value, 'UTC')->timezone(DashboardController::tz());
     }
 }
