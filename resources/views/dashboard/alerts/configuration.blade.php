@@ -63,7 +63,7 @@
     </div>
 
     <!-- Alert Trigger Rules -->
-    <div class="bg-white rounded-lg shadow p-6">
+    <div class="bg-white rounded-lg shadow p-6 hidden">
         <h3 class="text-lg font-semibold text-gray-800 mb-4">Aturan Pemicu Peringatan</h3>
 
         <div class="space-y-4">

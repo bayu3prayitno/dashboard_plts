@@ -43,8 +43,8 @@
                 <h1 class="text-3xl leading-tight font-medium tracking-tight uppercase sm:text-4xl">Monitoring<br>PLTS Cerdas</h1>
                 <p class="mt-2 text-sm text-muted">Pantau node sensor dan gateway LoRa secara real-time.</p>
                 <div class="mt-4 flex flex-wrap gap-2">
-                    <a href="{{ route('devices.create') }}" class="btn btn-primary"><x-icon name="plus" :size="16" /> Tambah Perangkat</a>
-                    <a href="{{ route('historical.exportCsv') }}" class="btn btn-outline bg-white/60"><x-icon name="download" :size="16" /> Ekspor CSV</a>
+                    <a href="{{ route('devices.create') }}" class="btn btn-primary hidden"><x-icon name="plus" :size="16" /> Tambah Perangkat</a>
+                    <a href="{{ route('historical.exportCsv') }}" class="btn btn-outline bg-white/60 hidden"><x-icon name="download" :size="16" /> Ekspor CSV</a>
                 </div>
             </div>
 
