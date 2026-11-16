@@ -17,7 +17,7 @@
     {{-- Panel hero (desktop) --}}
     <div class="hero-surface relative hidden flex-col justify-between overflow-hidden rounded-3xl p-10 lg:flex">
         <div class="flex items-center gap-2.5">
-            <span class="grid size-10 place-items-center rounded-2xl bg-primary text-lime"><x-icon name="sun" :size="20" /></span>
+            <span class="grid size-10 place-items-center rounded-2xl bg-primary text-lime"><x-logo :size="25" /></span>
             <span class="text-lg font-semibold">OmahIoT</span>
         </div>
         <img src="{{ asset('images/plts-3D.png') }}" alt=""
