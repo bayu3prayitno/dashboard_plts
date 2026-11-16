@@ -24,9 +24,13 @@ class MqttSubscribe extends Command
     /** Interval heartbeat (detik) yang dibaca web untuk menentukan status MQTT. */
     private const HEARTBEAT_INTERVAL = 5;
 
+    /** Seberapa sering (detik) kode diperiksa apakah sudah berubah. */
+    private const CODE_CHECK_INTERVAL = 30;
+
     public function handle(TelemetryIngestor $ingestor): int
     {
         $config = config('mqtt');
+        $codeVersion = $this->codeVersion();
 
         while (true) {
             try {
@@ -35,7 +39,9 @@ class MqttSubscribe extends Command
                     ->setPassword($config['password'])
                     ->setUseTls($config['tls']);
 
-                $client = new MqttClient($config['host'], $config['port'], $config['client_id']);
+                // subscriber dengan ID sama akan saling memutus koneksi.
+                $clientId = $config['client_id'].'-'.getmypid();
+                $client = new MqttClient($config['host'], $config['port'], $clientId);
                 $client->connect($settings, true);
 
                 $this->info("Terhubung ke broker {$config['host']}:{$config['port']}, topik {$config['topic']}");
@@ -46,12 +52,27 @@ class MqttSubscribe extends Command
 
                 // Loop manual agar heartbeat tetap dikirim selama menunggu pesan
                 $lastHeartbeat = 0.0;
+                $lastCodeCheck = microtime(true);
                 while (true) {
                     $client->loopOnce(microtime(true), true);
 
                     if (microtime(true) - $lastHeartbeat >= self::HEARTBEAT_INTERVAL) {
                         Cache::put(Gateway::MQTT_HEARTBEAT_KEY, time(), now()->addMinutes(10));
                         $lastHeartbeat = microtime(true);
+                    }
+
+                    // Kode PHP hanya dimuat sekali saat proses mulai. Jika kode berubah, keluar agar
+                    // wrapper (scripts/mqtt-subscribe.bat) menjalankan ulang dengan kode terbaru.
+                    if (microtime(true) - $lastCodeCheck >= self::CODE_CHECK_INTERVAL) {
+                        $lastCodeCheck = microtime(true);
+                        if ($this->codeVersion() !== $codeVersion) {
+                            Log::info('MQTT: kode berubah, subscriber dimulai ulang');
+                            $this->info('Kode berubah, memulai ulang subscriber...');
+                            Cache::forget(Gateway::MQTT_HEARTBEAT_KEY);
+                            $client->disconnect();
+
+                            return self::SUCCESS;
+                        }
                     }
                 }
             } catch (Throwable $e) {
@@ -62,6 +83,22 @@ class MqttSubscribe extends Command
                 sleep(5);
             }
         }
+    }
+
+    /** Sidik jari kode aplikasi: jumlah dan waktu ubah terbaru file di app, config, dan routes. */
+    private function codeVersion(): string
+    {
+        $count = 0;
+        $latest = 0;
+        foreach (['app', 'config', 'routes'] as $dir) {
+            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path($dir), \FilesystemIterator::SKIP_DOTS));
+            foreach ($iterator as $file) {
+                $count++;
+                $latest = max($latest, $file->getMTime());
+            }
+        }
+
+        return $count.':'.$latest;
     }
 
     private function handleMessage(string $topic, string $message, TelemetryIngestor $ingestor): void

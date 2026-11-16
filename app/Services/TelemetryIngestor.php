@@ -61,20 +61,13 @@ class TelemetryIngestor
             return null; // perangkat nonaktif: data diabaikan
         }
 
-        // Paket yang sama tidak disimpan dua kali
-        $duplicate = Measurement::where('device_id', $device->id)->where('packet_no', $data['packet_no'])->exists();
-        if ($duplicate) {
-            Log::info('MQTT: paket duplikat diabaikan', ['gateway' => $gatewayCode, 'node_id' => $data['node_id'], 'packet_no' => $data['packet_no']]);
+        // Paket dengan node dan nomor yang sama sudah ada: data lama ditimpa dengan yang baru
+        $existing = Measurement::where('device_id', $device->id)->where('packet_no', $data['packet_no'])->first();
 
-            return null;
-        }
-
-        return DB::transaction(function () use ($gateway, $device, $data) {
+        return DB::transaction(function () use ($gateway, $device, $data, $existing) {
             $now = now();
 
-            $measurement = Measurement::create([
-                'device_id' => $device->id,
-                'packet_no' => $data['packet_no'],
+            $fields = [
                 'temperature' => $data['temperature'],
                 'voltage' => $data['voltage'],
                 'current' => $data['current'],
@@ -84,14 +77,29 @@ class TelemetryIngestor
                 'snr' => $data['snr'],
                 'packet_loss' => $data['packet_loss'],
                 'recorded_at' => $data['recorded_at'] ?? $now,
-            ]);
+            ];
+
+            if ($existing) {
+                // Timpa data lama. Ambang batas tidak dievaluasi ulang agar alert yang sudah ada tidak terduplikasi.
+                $existing->update($fields);
+                Log::info('MQTT: paket duplikat ditimpa', ['gateway' => $gateway->gateway_code, 'node_id' => $data['node_id'], 'packet_no' => $data['packet_no']]);
+                $measurement = $existing;
+            } else {
+                $measurement = Measurement::create([
+                    'device_id' => $device->id,
+                    'packet_no' => $data['packet_no'],
+                    ...$fields,
+                ]);
+            }
 
             // Status online/offline dan MQTT dihitung saat dibaca (lihat Gateway), hanya waktu terakhir yang disimpan
             $device->update(['last_seen_at' => $now]);
             $gateway->update(['last_seen_at' => $now]);
 
             $this->alerts->resolveOffline($device, $now);
-            $this->alerts->evaluateMeasurement($device, $measurement);
+            if (! $existing) {
+                $this->alerts->evaluateMeasurement($device, $measurement);
+            }
 
             return $measurement;
         });
