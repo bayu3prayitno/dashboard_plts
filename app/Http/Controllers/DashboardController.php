@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Alert;
+use App\Models\Device;
+use App\Models\Gateway;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
  * Dashboard OmahIoT.
  *
- * Data masih tiruan (deterministik, mengikuti pola matahari harian) dan disusun dengan
- * struktur yang sama seperti nanti dari database: devices, gateway, alerts, sensor_data.
- * Ganti metode-metode mock di bawah dengan query Eloquent saat backend siap.
+ * Membaca data dari tabel devices, measurements, gateways, alerts dan settings.
+ * Waktu di database disimpan dalam UTC; tampilan dan pengelompokan memakai zona TZ (WIB).
  */
 class DashboardController extends Controller
 {
@@ -24,38 +28,43 @@ class DashboardController extends Controller
         'irradiance' => ['label' => 'Irradiance', 'unit' => 'W/m²', 'digits' => 0],
     ];
 
+    /** Jumlah peringatan aktif yang ditampilkan di kartu dashboard. */
+    private const ACTIVE_ALERT_LIMIT = 3;
+
+    /** Nilai status peringatan untuk komponen <x-status-badge>. */
+    private const ALERT_STATUS_KEYS = [
+        Alert::STATUS_NEW => 'baru',
+        Alert::STATUS_ACKNOWLEDGED => 'ditangani',
+        Alert::STATUS_RESOLVED => 'selesai',
+    ];
+
     public function index(): View
     {
         $now = CarbonImmutable::now(self::TZ);
-        $offlineMinutes = 15;
+        $offlineMinutes = Device::offlineTimeoutMinutes();
 
-        $devices = self::withStatus(self::mockDevices($now), $now, $offlineMinutes);
-        foreach ($devices as &$d) {
-            $d['latest'] = $this->sample($d['id'], $d['last_seen']);
-        }
-        unset($d);
+        $latest = $this->latestMeasurements();
+        $devices = Device::query()
+            ->orderBy('node_id')
+            ->get()
+            ->map(fn (Device $device) => $this->deviceRow($device, $latest->get($device->id), $offlineMinutes))
+            ->all();
 
-        $online = array_values(array_filter($devices, fn ($d) => $d['status'] === 'online'));
-        $offline = count(array_filter($devices, fn ($d) => $d['status'] === 'offline'));
-        $avg = fn (string $key) => count($online)
-            ? array_sum(array_map(fn ($d) => $d['latest'][$key], $online)) / count($online)
-            : null;
+        $online = array_values(array_filter($devices, fn ($d) => $d['status'] === Device::STATUS_ONLINE));
+        $offline = count(array_filter($devices, fn ($d) => $d['status'] === Device::STATUS_OFFLINE));
+        $avg = fn (string $key) => $this->average(array_column(array_column($online, 'latest'), $key));
 
-        // Seri tren untuk grafik (rata-rata semua node aktif)
-        $trend = $this->trend($devices, $now);
+        // Tren untuk grafik: rata-rata semua perangkat aktif
+        $activeIds = array_column(array_filter($devices, fn ($d) => $d['aktif']), 'id');
+        $trend = $this->trend($activeIds, $now);
 
         $powerNow = $avg('power');
-        $powerPeak = max(array_map(fn ($p) => $p['value'] ?? 0, $trend['power']['24h']) ?: [0]);
+        $powerPeak = max(array_map(fn ($p) => $p['value'] ?? 0, $trend['power']['24h']));
         $powerShare = $powerNow !== null && $powerPeak > 0 ? min(100, $powerNow / $powerPeak * 100) : 0;
 
-        $links = array_values(array_filter($devices, fn ($d) => $d['aktif']));
-        $received = count($links)
-            ? array_sum(array_map(fn ($d) => 100 - $d['packet_loss'], $links)) / count($links)
-            : null;
-
-        $alerts = self::mockAlerts($now);
-        $activeAlerts = array_values(array_filter($alerts, fn ($a) => $a['status'] !== 'selesai'));
-        $freshAlerts = array_values(array_filter($alerts, fn ($a) => $a['status'] === 'baru'));
+        // Kualitas link: perangkat aktif yang sudah pernah mengirim data
+        $links = array_values(array_filter($devices, fn ($d) => $d['aktif'] && $d['packet_loss'] !== null));
+        $received = $this->average(array_map(fn ($d) => 100 - $d['packet_loss'], $links));
 
         return view('dashboard.index', [
             'devices' => $devices,
@@ -68,136 +77,192 @@ class DashboardController extends Controller
             'irradianceSpark' => $trend['irradiance']['24h'],
             'received' => $received,
             'links' => $links,
-            'gateway' => self::mockGateway($now),
-            'activeAlerts' => $activeAlerts,
-            'freshAlerts' => $freshAlerts,
+            'gateway' => $this->gatewayRow(),
+            'activeAlertCount' => Alert::open()->count(),
+            'activeAlerts' => $this->activeAlerts(),
             'trend' => $trend,
             'sensors' => self::SENSORS,
             'now' => $now,
         ]);
     }
 
-    /** Nilai sensor tiruan satu node pada waktu tertentu (pola matahari + awan harian). */
-    private function sample(int $node, CarbonImmutable $t): array
+    /** Satu baris perangkat untuk tabel dan daftar di dashboard. */
+    private function deviceRow(Device $device, ?object $m, int $offlineMinutes): array
     {
-        $hour = $t->hour + $t->minute / 60;
-        $day = intdiv($t->timestamp + 7 * 3600, 86400);
-        $cloud = 0.65 + 0.35 * (crc32("cloud-$node-$day") % 1000) / 1000;
-        $noise = (crc32("n-$node-{$t->timestamp}") % 10000) / 10000;
-        $sun = $hour > 6 && $hour < 18 ? sin(M_PI * ($hour - 6) / 12) : 0;
-        $s = $sun * $cloud * (0.9 + 0.2 * $noise);
-
-        $voltage = 12.1 + 1.9 * $s + ($noise - 0.5) * 0.1;
-        $current = 0.08 + 4.2 * $s + ($noise - 0.5) * 0.04;
+        $latest = [];
+        foreach (array_keys(self::SENSORS) as $key) {
+            $latest[$key] = $m?->{$key} !== null ? (float) $m->{$key} : null;
+        }
 
         return [
-            'temperature' => round(24 + 2 * sin(M_PI * ($hour - 9) / 12) + 16 * $s + ($noise - 0.5) * 0.6, 1),
-            'voltage' => round($voltage, 2),
-            'current' => round($current, 2),
-            'power' => round($voltage * $current, 1),
-            'irradiance' => (int) round(1000 * $s),
+            'id' => $device->id,
+            'node_id' => $device->node_id,
+            'nama' => $device->name,
+            'lokasi' => $device->location,
+            'aktif' => $device->is_active,
+            'status' => $device->status($offlineMinutes),
+            'last_seen' => $device->last_seen_at,
+            'packet_loss' => $m?->packet_loss !== null ? (float) $m->packet_loss : null,
+            'latest' => $latest,
         ];
     }
 
-    /** Rata-rata harian 7 hari & rata-rata per 30 menit 24 jam untuk tiap sensor. */
-    private function trend(array $devices, CarbonImmutable $now): array
+    /** Pengukuran terakhir tiap perangkat, dikunci dengan device_id. */
+    private function latestMeasurements(): Collection
+    {
+        return DB::table('measurements as m')
+            ->joinSub(
+                DB::table('measurements')
+                    ->selectRaw('device_id, MAX(recorded_at) AS max_recorded_at')
+                    ->groupBy('device_id'),
+                'latest',
+                fn ($join) => $join
+                    ->on('m.device_id', '=', 'latest.device_id')
+                    ->on('m.recorded_at', '=', 'latest.max_recorded_at'),
+            )
+            ->select('m.*')
+            ->get()
+            ->unique('device_id')
+            ->keyBy('device_id');
+    }
+
+    /** Gateway utama untuk kartu status. Dipakai nilai kosong bila belum ada gateway. */
+    private function gatewayRow(): array
+    {
+        $gateway = Gateway::query()->oldest('id')->first();
+
+        if (! $gateway) {
+            return [
+                'nama' => 'Belum ada gateway',
+                'status' => 'offline',
+                'mqtt_status' => 'disconnected',
+                'internet_status' => 'disconnected',
+                'last_seen' => null,
+            ];
+        }
+
+        return [
+            'nama' => $gateway->name,
+            'status' => $gateway->status,
+            'mqtt_status' => $gateway->mqtt_status,
+            'internet_status' => $gateway->internet_status,
+            'last_seen' => $gateway->last_seen_at,
+        ];
+    }
+
+    /** Peringatan yang belum selesai, terbaru dulu. */
+    private function activeAlerts(): array
+    {
+        return Alert::open()
+            ->with('device:id,name')
+            ->latest('triggered_at')
+            ->limit(self::ACTIVE_ALERT_LIMIT)
+            ->get()
+            ->map(fn (Alert $alert) => [
+                'id' => $alert->id,
+                'device' => $alert->device?->name ?? '-',
+                'text' => $alert->message(),
+                'waktu' => $alert->triggered_at,
+                'status' => self::ALERT_STATUS_KEYS[$alert->status] ?? 'selesai',
+            ])
+            ->all();
+    }
+
+    /**
+     * Tren sensor: 24 jam (48 bucket @30 menit) dan 7 hari (rata-rata harian), keduanya rata-rata lintas perangkat aktif.
+     *
+     * @param  array<int>  $deviceIds
+     */
+    private function trend(array $deviceIds, CarbonImmutable $now): array
     {
         $days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-        $active = array_filter($devices, fn ($d) => $d['aktif']);
-        $out = [];
+        // WIB tidak memakai DST, jadi offset jam tetap; dipakai untuk pengelompokan di SQL
+        $offsetHours = intdiv($now->getOffset(), 3600);
 
-        $avgAt = function (CarbonImmutable $t) use ($active) {
-            $rows = [];
-            foreach ($active as $d) {
-                if ($t <= $d['last_seen']) {
-                    $rows[] = $this->sample($d['id'], $t);
-                }
-            }
+        // 48 bucket @30 menit yang berakhir di bucket berjalan (pukul 08:40 → bucket 08:30 paling kanan)
+        $currentBucket = $now->setMinute($now->minute >= 30 ? 30 : 0)->startOfMinute();
+        $start = $currentBucket->subMinutes(30 * 47);
+        $rows24 = $this->averages(
+            $deviceIds,
+            $start,
+            $now,
+            "DATE_FORMAT(DATE_ADD(recorded_at, INTERVAL {$offsetHours} HOUR), '%Y-%m-%d %H') AS hour_key, IF(MINUTE(recorded_at) >= 30, 1, 0) AS half_key",
+            ['hour_key', 'half_key'],
+        );
 
-            return $rows;
-        };
-
-        // 24 jam: 48 bucket @30 menit
-        $h24 = [];
-        $start = $now->subDay()->startOfHour();
+        $series24 = [];
         for ($i = 0; $i < 48; $i++) {
             $t = $start->addMinutes(30 * $i);
-            $h24[] = ['label' => $t->format('H:i'), 'title' => $t->translatedFormat('d M H:i'), 'rows' => $avgAt($t)];
+            $series24[] = [
+                'label' => $t->format('H:i'),
+                'title' => $t->translatedFormat('d M H:i'),
+                'row' => $rows24->get($t->format('Y-m-d H').'|'.($t->minute >= 30 ? 1 : 0)),
+            ];
         }
 
-        // 7 hari: rata-rata sampel tiap 30 menit per hari
-        $d7 = [];
+        $rows7 = $this->averages(
+            $deviceIds,
+            $now->subDays(6)->startOfDay(),
+            $now,
+            "DATE(DATE_ADD(recorded_at, INTERVAL {$offsetHours} HOUR)) AS day_key",
+            ['day_key'],
+        );
+
+        $series7 = [];
         for ($i = 6; $i >= 0; $i--) {
             $day = $now->subDays($i)->startOfDay();
-            $rows = [];
-            for ($m = 0; $m < 48; $m++) {
-                $t = $day->addMinutes(30 * $m);
-                if ($t > $now) {
-                    break;
-                }
-                array_push($rows, ...$avgAt($t));
-            }
-            $d7[] = ['label' => $days[$day->dayOfWeek], 'title' => $days[$day->dayOfWeek].', '.$day->format('d M'), 'rows' => $rows];
+            $series7[] = [
+                'label' => $days[$day->dayOfWeek],
+                'title' => $days[$day->dayOfWeek].', '.$day->format('d M'),
+                'row' => $rows7->get($day->format('Y-m-d')),
+            ];
         }
 
+        $out = [];
         foreach (array_keys(self::SENSORS) as $key) {
-            $mean = fn ($rows) => count($rows) ? round(array_sum(array_column($rows, $key)) / count($rows), 2) : null;
+            $value = fn ($row) => $row?->{$key} !== null ? round((float) $row->{$key}, 2) : null;
+
             $out[$key] = [
-                '24h' => array_map(fn ($b) => ['label' => $b['label'], 'title' => $b['title'], 'value' => $mean($b['rows'])], $h24),
-                '7d' => array_map(fn ($b) => ['label' => $b['label'], 'title' => $b['title'], 'value' => $mean($b['rows'])], $d7),
+                '24h' => array_map(fn ($b) => ['label' => $b['label'], 'title' => $b['title'], 'value' => $value($b['row'])], $series24),
+                '7d' => array_map(fn ($b) => ['label' => $b['label'], 'title' => $b['title'], 'value' => $value($b['row'])], $series7),
             ];
         }
 
         return $out;
     }
 
-    public static function mockDevices(CarbonImmutable $now): array
+    /**
+     * Rata-rata semua sensor per grup waktu, hanya dari perangkat yang diberikan.
+     *
+     * @param  array<int>  $deviceIds
+     * @param  array<string>  $groupBy  alias kolom grup dari $groupSql
+     * @return Collection<string, object> dikunci dengan nilai grup digabung "|"
+     */
+    private function averages(array $deviceIds, CarbonImmutable $from, CarbonImmutable $to, string $groupSql, array $groupBy): Collection
     {
-        $slot = $now->setTime($now->hour, intdiv($now->minute, 5) * 5);
+        if ($deviceIds === []) {
+            return collect();
+        }
 
-        return [
-            ['id' => 1, 'node_id' => 1, 'nama' => 'Node 1 — Atap Gedung A', 'lokasi' => 'Gedung A, Atap', 'aktif' => true, 'last_seen' => $slot, 'packet_loss' => 1.0, 'rssi' => -72, 'snr' => 9.5],
-            ['id' => 2, 'node_id' => 2, 'nama' => 'Node 2 — Atap Gedung B', 'lokasi' => 'Gedung B, Atap', 'aktif' => true, 'last_seen' => $slot, 'packet_loss' => 6.0, 'rssi' => -88, 'snr' => 6.0],
-            ['id' => 3, 'node_id' => 3, 'nama' => 'Node 3 — Area Parkir', 'lokasi' => 'Area Parkir Timur', 'aktif' => true, 'last_seen' => $slot->subMinutes(130), 'packet_loss' => 4.0, 'rssi' => -103, 'snr' => 1.5],
-        ];
+        $avgSql = implode(', ', array_map(fn (string $key) => "AVG({$key}) AS {$key}", array_keys(self::SENSORS)));
+
+        return DB::table('measurements')
+            ->whereIn('device_id', $deviceIds)
+            ->whereBetween('recorded_at', [
+                $from->utc()->format('Y-m-d H:i:s'),
+                $to->utc()->format('Y-m-d H:i:s'),
+            ])
+            ->selectRaw("{$groupSql}, {$avgSql}")
+            ->groupBy($groupBy)
+            ->get()
+            ->keyBy(fn ($row) => implode('|', array_map(fn (string $col) => $row->{$col}, $groupBy)));
     }
 
-    public static function mockGateway(CarbonImmutable $now): array
+    /** Rata-rata nilai yang tidak null; null bila tidak ada data. */
+    private function average(array $values): ?float
     {
-        return [
-            'id' => 1,
-            'nama' => 'Gateway LoRa Utama',
-            'lokasi' => 'Ruang Kontrol, Gedung A',
-            'status' => 'online',
-            'mqtt_status' => 'connected',
-            'internet_status' => 'connected',
-            'last_seen' => $now->subMinute(),
-            'beacon_menit' => 5,
-            'broker' => 'mqtt.omahiot.example:8883',
-            'topic' => 'omahiot/gateway-1/node/+/data',
-            'ip_lokal' => '192.168.1.50',
-        ];
-    }
+        $values = array_values(array_filter($values, fn ($v) => $v !== null));
 
-    /** Tambahkan status online/offline/nonaktif berdasarkan last_seen. */
-    public static function withStatus(array $devices, CarbonImmutable $now, int $offlineMinutes = 15): array
-    {
-        return array_map(function ($d) use ($now, $offlineMinutes) {
-            $d['status'] = ! $d['aktif'] ? 'nonaktif'
-                : ($d['last_seen']->diffInMinutes($now, true) > $offlineMinutes ? 'offline' : 'online');
-
-            return $d;
-        }, $devices);
-    }
-
-    public static function mockAlerts(CarbonImmutable $now): array
-    {
-        return [
-            ['id' => 1, 'device' => 'Node 3 — Area Parkir', 'text' => 'Perangkat offline — tidak mengirim data', 'waktu' => $now->subMinutes(115), 'status' => 'baru'],
-            ['id' => 2, 'device' => 'Node 2 — Atap Gedung B', 'text' => 'Suhu 41,3 °C di atas ambang 40,0 °C', 'waktu' => $now->subMinutes(40), 'status' => 'baru'],
-            ['id' => 3, 'device' => 'Node 1 — Atap Gedung A', 'text' => 'Tegangan 10,30 V di bawah ambang 10,50 V', 'waktu' => $now->subHours(5), 'status' => 'ditangani'],
-            ['id' => 4, 'device' => 'Node 3 — Area Parkir', 'text' => 'Irradiance 1.236 W/m² di atas ambang 1.200 W/m²', 'waktu' => $now->subHours(26), 'status' => 'ditangani'],
-            ['id' => 5, 'device' => 'Node 2 — Atap Gedung B', 'text' => 'Daya 84,6 W di atas ambang 80,0 W', 'waktu' => $now->subDays(2), 'status' => 'selesai'],
-        ];
+        return $values === [] ? null : array_sum($values) / count($values);
     }
 }

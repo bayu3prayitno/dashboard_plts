@@ -27,7 +27,7 @@
         ['route' => 'devices.index', 'icon' => 'cpu', 'label' => 'Total perangkat', 'value' => count($devices)],
         ['route' => 'devices.index', 'icon' => 'wifi', 'label' => 'Online', 'value' => $onlineCount],
         ['route' => 'devices.index', 'icon' => 'wifi-off', 'label' => "Offline > {$offlineMinutes} mnt", 'value' => $offlineCount],
-        ['route' => 'alerts.index', 'icon' => 'bell-ring', 'label' => 'Peringatan aktif', 'value' => count($activeAlerts)],
+        ['route' => 'alerts.index', 'icon' => 'bell-ring', 'label' => 'Peringatan aktif', 'value' => $activeAlertCount],
     ];
 @endphp
 
@@ -161,7 +161,7 @@
                                         <a href="{{ route('devices.show', $d['id']) }}" class="font-medium hover:underline">{{ $d['nama'] }}</a>
                                         <div class="mt-1 flex flex-wrap items-center gap-2">
                                             <x-status-badge :status="$d['status']" />
-                                            <span class="text-xs whitespace-nowrap text-muted" title="{{ $d['last_seen']->translatedFormat('d M Y H:i') }} WIB">{{ Format::relTime($d['last_seen']) }}</span>
+                                            <span class="text-xs whitespace-nowrap text-muted" title="{{ $d['last_seen'] ? $d['last_seen']->timezone(\App\Http\Controllers\DashboardController::TZ)->translatedFormat('d M Y H:i').' WIB' : 'Belum pernah mengirim data' }}">{{ Format::relTime($d['last_seen']) }}</span>
                                         </div>
                                     </td>
                                     @foreach ($sensors as $key => $s)
@@ -233,7 +233,7 @@
                     <h2 class="text-base font-semibold">Peringatan Terbaru</h2>
                     <a href="{{ route('alerts.index') }}" class="rounded-full border border-line px-3 py-1 text-xs font-medium hover:bg-canvas">Lihat semua</a>
                 </div>
-                @if (count($activeAlerts) === 0)
+                @if ($activeAlertCount === 0)
                     <p class="py-8 text-center text-sm text-muted">Tidak ada peringatan aktif.</p>
                 @endif
                 <ul class="space-y-3">

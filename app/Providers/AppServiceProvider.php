@@ -2,9 +2,8 @@
 
 namespace App\Providers;
 
-use App\Http\Controllers\DashboardController;
 use App\Models\Alert;
-use Carbon\CarbonImmutable;
+use App\Models\Device;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,10 +22,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Data untuk header & sidebar (badge peringatan, notifikasi, pencarian perangkat).
-        // Masih tiruan — ganti dengan query model saat backend siap.
+        // Data untuk header & sidebar
         View::composer('layouts.app', function ($view) {
-            $now = CarbonImmutable::now(DashboardController::TZ);
             $openAlerts = Alert::query()->open()->with('device:id,name')->latest('triggered_at')->get();
 
             $view->with([
@@ -46,13 +43,18 @@ class AppServiceProvider extends ServiceProvider
                     ])
                     ->values()
                     ->all(),
-                'layoutDevices' => array_map(fn ($d) => [
-                    'id' => $d['id'],
-                    'nama' => $d['nama'],
-                    'lokasi' => $d['lokasi'],
-                    'node_id' => $d['node_id'],
-                    'url' => route('devices.show', $d['id']),
-                ], DashboardController::mockDevices($now)),
+                'layoutDevices' => Device::query()
+                    ->orderBy('node_id')
+                    ->get(['id', 'node_id', 'name', 'location'])
+                    ->map(fn (Device $d) => [
+                        'id' => $d->id,
+                        'nama' => $d->name,
+                        'lokasi' => $d->location,
+                        'node_id' => $d->node_id,
+                        'url' => route('devices.show', $d->id),
+                    ])
+                    ->values()
+                    ->all(),
             ]);
         });
     }

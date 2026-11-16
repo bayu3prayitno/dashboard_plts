@@ -40,14 +40,19 @@ class Device extends Model
         return is_numeric($value) ? (int) $value : self::DEFAULT_OFFLINE_TIMEOUT_MINUTES;
     }
 
-    /** Status untuk tampilan: nonaktif, online, atau offline (dihitung dari last_seen_at). */
-    public function status(): string
+    /**
+     * Status untuk tampilan: nonaktif, online, atau offline (dihitung dari last_seen_at).
+     * Kirim $offlineMinutes bila sudah dibaca, agar tidak query settings berulang.
+     */
+    public function status(?int $offlineMinutes = null): string
     {
         if (! $this->is_active) {
             return self::STATUS_INACTIVE;
         }
 
-        if ($this->last_seen_at === null || $this->last_seen_at->lt(now()->subMinutes(self::offlineTimeoutMinutes()))) {
+        $offlineMinutes ??= self::offlineTimeoutMinutes();
+
+        if ($this->last_seen_at === null || $this->last_seen_at->lt(now()->subMinutes($offlineMinutes))) {
             return self::STATUS_OFFLINE;
         }
 
