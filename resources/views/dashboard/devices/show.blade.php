@@ -146,18 +146,18 @@
         @endif
     </div>
 
-    <!-- Historical Data Charts (belum dihubungkan ke data) -->
+    <!-- Tren 24 jam (rata-rata per 30 menit) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Trend Suhu (24 Jam)</h3>
-            <div class="h-64 bg-gray-50 rounded flex items-center justify-center">
-                <p class="text-gray-500">Grafik akan ditampilkan di sini</p>
+            <div class="relative h-64">
+                <canvas id="chart-temperature" aria-label="Trend suhu 24 jam"></canvas>
             </div>
         </div>
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Trend Tegangan & Arus (24 Jam)</h3>
-            <div class="h-64 bg-gray-50 rounded flex items-center justify-center">
-                <p class="text-gray-500">Grafik akan ditampilkan di sini</p>
+            <div class="relative h-64">
+                <canvas id="chart-voltage-current" aria-label="Trend tegangan dan arus 24 jam"></canvas>
             </div>
         </div>
     </div>
@@ -179,6 +179,69 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script>
+(function () {
+    const TREND = @json($trend24);
+    const hasData = (arr) => arr.some((v) => v !== null);
+
+    const line = (label, data, color) => ({
+        label,
+        data,
+        borderColor: color,
+        backgroundColor: color + '22',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        tension: 0.3,
+        spanGaps: true,
+    });
+
+    const baseOptions = (yTitle) => ({
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+            x: { ticks: { maxTicksLimit: 12, autoSkip: true }, grid: { display: false } },
+            y: { title: { display: true, text: yTitle } },
+        },
+        plugins: { legend: { position: 'bottom' } },
+    });
+
+    const showEmpty = (id) => {
+        const canvas = document.getElementById(id);
+        canvas.parentElement.innerHTML = '<div class="h-64 flex items-center justify-center text-gray-500 text-sm">Belum ada data dalam 24 jam terakhir.</div>';
+    };
+
+    if (hasData(TREND.temperature)) {
+        new Chart(document.getElementById('chart-temperature'), {
+            type: 'line',
+            data: { labels: TREND.labels, datasets: [line('Suhu (°C)', TREND.temperature, '#6f9f12')] },
+            options: baseOptions('°C'),
+        });
+    } else {
+        showEmpty('chart-temperature');
+    }
+
+    if (hasData(TREND.voltage) || hasData(TREND.current)) {
+        const options = baseOptions('V');
+        options.scales.y1 = { position: 'right', title: { display: true, text: 'A' }, grid: { drawOnChartArea: false } };
+        new Chart(document.getElementById('chart-voltage-current'), {
+            type: 'line',
+            data: {
+                labels: TREND.labels,
+                datasets: [
+                    { ...line('Tegangan (V)', TREND.voltage, '#2563eb'), yAxisID: 'y' },
+                    { ...line('Arus (A)', TREND.current, '#ea580c'), yAxisID: 'y1' },
+                ],
+            },
+            options,
+        });
+    } else {
+        showEmpty('chart-voltage-current');
+    }
+})();
+</script>
 <script>
 function copyFirmwareConfig() {
     const text = document.getElementById('firmware-config')?.innerText ?? '';

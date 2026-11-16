@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\Device;
+use Carbon\CarbonImmutable;
 use App\Models\Gateway;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -26,7 +27,44 @@ class DeviceController extends Controller
             'device' => $device->load('gateway'),
             'latest' => $device->measurements()->latest('recorded_at')->first(),
             'alerts' => $device->alerts()->latest('triggered_at')->limit(5)->get(),
+            'trend24' => $this->trend24h($device),
         ]);
+    }
+
+    /**
+     * Tren 24 jam perangkat: 48 bucket @30 menit (rata-rata), sama seperti grafik di dashboard.
+     *
+     * @return array{labels: array<int, string>, temperature: array<int, ?float>, voltage: array<int, ?float>, current: array<int, ?float>}
+     */
+    private function trend24h(Device $device): array
+    {
+        $now = CarbonImmutable::now(DashboardController::TZ);
+        $currentBucket = $now->setMinute($now->minute >= 30 ? 30 : 0)->startOfMinute();
+        $start = $currentBucket->subMinutes(30 * 47);
+
+        $rows = $device->measurements()
+            ->where('recorded_at', '>=', $start->utc()->format('Y-m-d H:i:s'))
+            ->get(['recorded_at', 'temperature', 'voltage', 'current']);
+
+        $groups = [];
+        foreach ($rows as $row) {
+            $t = $row->recorded_at->timezone(DashboardController::TZ);
+            $groups[$t->format('Y-m-d H').'|'.($t->minute >= 30 ? 1 : 0)][] = $row;
+        }
+
+        $out = ['labels' => [], 'temperature' => [], 'voltage' => [], 'current' => []];
+        for ($i = 0; $i < 48; $i++) {
+            $t = $start->addMinutes(30 * $i);
+            $group = collect($groups[$t->format('Y-m-d H').'|'.($t->minute >= 30 ? 1 : 0)] ?? []);
+            $out['labels'][] = $t->format('H:i');
+
+            foreach (['temperature', 'voltage', 'current'] as $key) {
+                $values = $group->pluck($key)->filter(fn ($v) => $v !== null)->map(fn ($v) => (float) $v);
+                $out[$key][] = $values->isEmpty() ? null : round($values->avg(), 2);
+            }
+        }
+
+        return $out;
     }
 
     public function create(): View

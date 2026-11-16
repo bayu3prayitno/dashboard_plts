@@ -119,7 +119,7 @@
                 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h2 class="text-xl font-medium">Tren <span data-trend-label>Daya</span></h2>
-                        <p class="mt-1 text-xs text-muted" data-trend-sub>Rata-rata harian dari semua perangkat, dalam W.</p>
+                        <p class="mt-1 text-xs text-muted" data-trend-sub>Rata-rata harian per perangkat, dalam W.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <select data-trend-sensor aria-label="Pilih sensor"
@@ -137,6 +137,7 @@
                 <div class="relative h-[280px]" data-trend-chart>
                     <div data-trend-tip class="pointer-events-none absolute z-10 hidden rounded-xl border border-line bg-white px-3 py-2 text-xs shadow-lg"></div>
                 </div>
+                <div data-trend-legend class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted"></div>
             </section>
 
             {{-- Nilai sensor terkini per node --}}
@@ -277,18 +278,23 @@
 @push('scripts')
 <script>
 (function () {
-    const TREND = @json($trend);
+    const TRENDS = @json($trendDevices);
     const SENSORS = @json($sensors);
     const card = document.getElementById('trend-card');
     const box = card.querySelector('[data-trend-chart]');
     const tip = card.querySelector('[data-trend-tip]');
+    const legend = card.querySelector('[data-trend-legend]');
     const select = card.querySelector('[data-trend-sensor]');
     const tabs = card.querySelectorAll('[data-trend-range]');
     const NS = 'http://www.w3.org/2000/svg';
-    const C = { axis: '#6f766f', grid: '#eceeea', dark: '#262a26', lime: '#a8d93a', limeDark: '#6f9f12' };
+    const C = { axis: '#6f766f', grid: '#eceeea', cursor: '#b9c2bd', hover: '#f4f5f4' };
+    // Warna per perangkat (urut sesuai daftar perangkat aktif)
+    const PALETTE = ['#6f9f12', '#2563eb', '#ea580c', '#8b5cf6', '#0891b2', '#db2777', '#ca8a04', '#16a34a', '#64748b', '#dc2626'];
+    const colorOf = (i) => PALETTE[i % PALETTE.length];
     let sensor = 'power', range = '7d';
 
     const fmt = (v, d) => v == null ? '—' : v.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     const el = (tag, attrs, parent) => {
         const n = document.createElementNS(NS, tag);
         for (const k in attrs) n.setAttribute(k, attrs[k]);
@@ -309,10 +315,12 @@
 
     function draw() {
         const meta = SENSORS[sensor];
-        const data = TREND[sensor][range];
+        const data = TRENDS[sensor][range]; // { labels, titles, series: [{ name, data }] }
+        const n = data.labels.length;
+        const isBar = range === '7d';
         card.querySelector('[data-trend-label]').textContent = meta.label;
         card.querySelector('[data-trend-sub]').textContent =
-            `${range === '7d' ? 'Rata-rata harian' : 'Rata-rata per 30 menit'} dari semua perangkat, dalam ${meta.unit}.`;
+            `${isBar ? 'Rata-rata harian' : 'Rata-rata per 30 menit'} per perangkat, dalam ${meta.unit}.`;
         tabs.forEach((t) => {
             const on = t.dataset.trendRange === range;
             t.className = 'rounded-xl px-3 py-1.5 text-sm font-medium transition-colors ' +
@@ -321,8 +329,10 @@
 
         box.querySelector('svg')?.remove();
         box.querySelector('[data-empty]')?.remove();
-        const values = data.map((d) => d.value).filter((v) => v != null);
-        if (!values.length) {
+        legend.innerHTML = '';
+
+        const all = data.series.flatMap((s) => s.data.filter((v) => v != null));
+        if (!all.length) {
             box.insertAdjacentHTML('beforeend', '<p data-empty class="py-8 text-center text-sm text-muted">Belum ada data pada rentang ini.</p>');
             return;
         }
@@ -330,10 +340,13 @@
         const W = box.clientWidth, H = box.clientHeight;
         const m = { t: 8, r: 8, b: 26, l: 48 };
         const iw = W - m.l - m.r, ih = H - m.t - m.b;
-        const isBar = range === '7d';
-        const ticks = niceTicks(isBar ? 0 : Math.min(...values), Math.max(...values));
+        // Batang mulai dari 0; garis boleh mengikuti rentang data
+        const ticks = niceTicks(isBar ? 0 : Math.min(...all), Math.max(...all));
         const y0 = ticks[0], y1 = ticks.at(-1);
         const y = (v) => m.t + ih - ((v - y0) / (y1 - y0)) * ih;
+        const slot = iw / n;
+        const x = (i) => m.l + (n > 1 ? i / (n - 1) : 0.5) * iw; // posisi titik (mode garis)
+        const center = (i) => (isBar ? m.l + slot * (i + 0.5) : x(i));
         const svg = el('svg', { width: W, height: H, class: 'block' });
         box.prepend(svg);
 
@@ -343,77 +356,107 @@
             tx.textContent = fmt(t, t % 1 ? 1 : 0);
         });
 
-        const showTip = (d, x, yy) => {
-            tip.innerHTML = `<p class="text-muted">${d.title}</p><p class="mt-0.5 text-sm font-semibold text-ink">${fmt(d.value, meta.digits)} ${meta.unit}</p>`;
-            tip.classList.remove('hidden');
-            const left = Math.min(Math.max(x - tip.offsetWidth / 2, 0), W - tip.offsetWidth);
-            tip.style.left = left + 'px';
-            tip.style.top = Math.max(yy - tip.offsetHeight - 10, 0) + 'px';
-        };
-        const hideTip = () => tip.classList.add('hidden');
+        // Label sumbu-X
+        const step = isBar ? 1 : Math.max(1, Math.ceil(n / 12));
+        data.labels.forEach((lbl, i) => {
+            if (i % step !== 0 && i !== n - 1) return;
+            const t = el('text', { x: center(i), y: H - 6, 'text-anchor': 'middle', 'font-size': 11, fill: C.axis }, svg);
+            t.textContent = lbl;
+        });
+
+        // Sorot kolom/titik yang sedang disorot kursor (di belakang batang)
+        const hl = isBar ? el('rect', { x: m.l, y: m.t, width: slot, height: ih, fill: 'transparent', 'pointer-events': 'none' }, svg) : null;
 
         if (isBar) {
-            const max = Math.max(...values);
-            const slot = iw / data.length;
-            const bw = Math.min(40, slot * 0.6);
-            data.forEach((d, i) => {
-                const cx = m.l + slot * (i + 0.5);
-                const lbl = el('text', { x: cx, y: H - 6, 'text-anchor': 'middle', 'font-size': 11, fill: C.axis }, svg);
-                lbl.textContent = d.label;
-                const hover = el('rect', { x: m.l + slot * i, y: m.t, width: slot, height: ih, fill: 'transparent' }, svg);
-                if (d.value == null) return;
-                const top = y(d.value), h = y(y0) - top, r = Math.min(8, bw / 2, h);
-                const x = cx - bw / 2, b = y(y0);
-                el('path', {
-                    d: `M${x} ${b}V${top + r}Q${x} ${top} ${x + r} ${top}H${x + bw - r}Q${x + bw} ${top} ${x + bw} ${top + r}V${b}Z`,
-                    fill: d.value === max ? C.lime : C.dark, 'pointer-events': 'none',
-                }, svg);
-                hover.addEventListener('mouseenter', () => { hover.setAttribute('fill', '#f4f5f4'); svg.insertBefore(hover, svg.querySelector('path')); showTip(d, cx, top); });
-                hover.addEventListener('mouseleave', () => { hover.setAttribute('fill', 'transparent'); hideTip(); });
+            // Batang berkelompok: satu batang per perangkat dalam setiap hari
+            const S = data.series.length;
+            // Lebar kelompok mengikuti ruang per hari (maks. 40px per batang)
+            const groupW = Math.min(slot * 0.8, S * 40);
+            const bw = groupW / S;
+            const base = y(y0);
+            data.series.forEach((s, si) => {
+                s.data.forEach((v, i) => {
+                    if (v == null) return;
+                    const cx = m.l + slot * (i + 0.5) - groupW / 2 + bw * (si + 0.5);
+                    const top = y(v);
+                    const w = Math.max(bw - 2, 2);
+                    const r = Math.min(4, w / 2, Math.max(base - top, 0));
+                    const x0 = cx - w / 2;
+                    el('path', {
+                        d: `M${x0} ${base}V${top + r}Q${x0} ${top} ${x0 + r} ${top}H${x0 + w - r}Q${x0 + w} ${top} ${x0 + w} ${top + r}V${base}Z`,
+                        fill: colorOf(si), 'pointer-events': 'none',
+                    }, svg);
+                });
             });
         } else {
-            const x = (i) => m.l + (i / (data.length - 1)) * iw;
-            const gid = 'trend-grad';
-            const defs = el('defs', {}, svg);
-            const lg = el('linearGradient', { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-            el('stop', { offset: '0%', 'stop-color': C.lime, 'stop-opacity': 0.45 }, lg);
-            el('stop', { offset: '100%', 'stop-color': C.lime, 'stop-opacity': 0 }, lg);
-
-            // Pecah menjadi segmen agar rentang tanpa data tetap terputus
-            let seg = [];
-            const flush = () => {
-                if (seg.length > 1) {
-                    const line = seg.map(([i, v], k) => `${k ? 'L' : 'M'}${x(i)} ${y(v)}`).join('');
-                    el('path', { d: `${line}L${x(seg.at(-1)[0])} ${y(y0)}L${x(seg[0][0])} ${y(y0)}Z`, fill: `url(#${gid})` }, svg);
-                    el('path', { d: line, fill: 'none', stroke: C.limeDark, 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+            // Satu garis per perangkat; titik tetap digambar agar data yang jarang terlihat
+            data.series.forEach((s, si) => {
+                const color = colorOf(si);
+                const pts = s.data.map((v, i) => (v == null ? null : [i, v])).filter(Boolean);
+                if (pts.length > 1) {
+                    const d = pts.map(([i, v], k) => `${k ? 'L' : 'M'}${x(i)} ${y(v)}`).join('');
+                    el('path', { d, fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'pointer-events': 'none' }, svg);
                 }
-                seg = [];
-            };
-            data.forEach((d, i) => (d.value == null ? flush() : seg.push([i, d.value])));
-            flush();
-
-            data.forEach((d, i) => {
-                if (i % 6 === 0) {
-                    const t = el('text', { x: x(i), y: H - 6, 'text-anchor': 'middle', 'font-size': 11, fill: C.axis }, svg);
-                    t.textContent = d.label;
-                }
+                pts.forEach(([i, v]) => el('circle', { cx: x(i), cy: y(v), r: 3, fill: color, stroke: '#fff', 'stroke-width': 1.5, 'pointer-events': 'none' }, svg));
             });
-
-            const cursor = el('line', { y1: m.t, y2: m.t + ih, stroke: '#b9c2bd', visibility: 'hidden' }, svg);
-            const dot = el('circle', { r: 4, fill: C.limeDark, stroke: '#fff', 'stroke-width': 2, visibility: 'hidden' }, svg);
-            const overlay = el('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent' }, svg);
-            overlay.addEventListener('mousemove', (e) => {
-                const px = e.clientX - svg.getBoundingClientRect().left;
-                const i = Math.round(((px - m.l) / iw) * (data.length - 1));
-                const d = data[Math.max(0, Math.min(data.length - 1, i))];
-                if (!d || d.value == null) { hideTip(); cursor.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); return; }
-                const cx = x(data.indexOf(d));
-                cursor.setAttribute('x1', cx); cursor.setAttribute('x2', cx); cursor.setAttribute('visibility', 'visible');
-                dot.setAttribute('cx', cx); dot.setAttribute('cy', y(d.value)); dot.setAttribute('visibility', 'visible');
-                showTip(d, cx, y(d.value));
-            });
-            overlay.addEventListener('mouseleave', () => { hideTip(); cursor.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); });
         }
+
+        data.series.forEach((s, si) => {
+            const item = document.createElement('span');
+            item.className = 'inline-flex items-center gap-1.5';
+            item.innerHTML = `<span class="h-2.5 w-2.5 rounded-full" style="background:${colorOf(si)}"></span>${esc(s.name)}`;
+            legend.appendChild(item);
+        });
+
+        // Kursor dan titik per perangkat (mode garis)
+        const cursor = isBar ? null : el('line', { y1: m.t, y2: m.t + ih, stroke: C.cursor, visibility: 'hidden' }, svg);
+        const dots = isBar ? [] : data.series.map((s, si) => el('circle', { r: 4, fill: colorOf(si), stroke: '#fff', 'stroke-width': 2, visibility: 'hidden' }, svg));
+
+        const hide = () => {
+            tip.classList.add('hidden');
+            if (hl) hl.setAttribute('fill', 'transparent');
+            if (cursor) cursor.setAttribute('visibility', 'hidden');
+            dots.forEach((d) => d.setAttribute('visibility', 'hidden'));
+        };
+
+        // Hover: tooltip berisi semua perangkat pada titik/hari yang ditunjuk
+        const overlay = el('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent' }, svg);
+        overlay.addEventListener('mousemove', (e) => {
+            const px = e.clientX - svg.getBoundingClientRect().left;
+            const i = isBar
+                ? Math.floor((px - m.l) / slot)
+                : Math.round(((px - m.l) / iw) * (n - 1));
+            const idx = Math.max(0, Math.min(n - 1, i));
+            const rows = data.series
+                .map((s, si) => ({ s, si, v: s.data[idx] }))
+                .filter((r) => r.v != null);
+            if (!rows.length) return hide();
+
+            const cx = center(idx);
+            if (isBar) {
+                hl.setAttribute('x', m.l + slot * idx);
+                hl.setAttribute('fill', C.hover);
+            } else {
+                cursor.setAttribute('x1', cx);
+                cursor.setAttribute('x2', cx);
+                cursor.setAttribute('visibility', 'visible');
+                data.series.forEach((s, si) => {
+                    const v = s.data[idx];
+                    dots[si].setAttribute('cx', cx);
+                    dots[si].setAttribute('cy', v == null ? 0 : y(v));
+                    dots[si].setAttribute('visibility', v == null ? 'hidden' : 'visible');
+                });
+            }
+
+            tip.innerHTML = `<p class="text-muted">${esc(data.titles[idx])}</p>` + rows.map(({ s, si, v }) =>
+                `<p class="mt-0.5 flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background:${colorOf(si)}"></span>${esc(s.name)}: <b class="text-ink">${fmt(v, meta.digits)} ${meta.unit}</b></p>`
+            ).join('');
+            tip.classList.remove('hidden');
+            const left = Math.min(Math.max(cx - tip.offsetWidth / 2, 0), W - tip.offsetWidth);
+            tip.style.left = left + 'px';
+            tip.style.top = m.t + 'px';
+        });
+        overlay.addEventListener('mouseleave', hide);
     }
 
     select.addEventListener('change', () => { sensor = select.value; draw(); });

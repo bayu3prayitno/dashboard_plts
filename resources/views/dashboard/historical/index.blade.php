@@ -105,38 +105,23 @@
         @endif
     </div>
 
-    <!-- Chart Visualization -->
+    <!-- Chart Visualization (data dari endpoint chart-data, mengikuti filter di atas) -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Temperature Chart -->
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Grafik Suhu</h3>
-            <div class="h-64 bg-gray-50 rounded flex items-center justify-center">
-                <p class="text-gray-500">Grafik akan ditampilkan di sini</p>
-            </div>
+            <div class="relative h-64"><canvas id="chart-temperature" aria-label="Grafik suhu"></canvas></div>
         </div>
-
-        <!-- Voltage & Current Chart -->
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Grafik Tegangan & Arus</h3>
-            <div class="h-64 bg-gray-50 rounded flex items-center justify-center">
-                <p class="text-gray-500">Grafik akan ditampilkan di sini</p>
-            </div>
+            <div class="relative h-64"><canvas id="chart-voltage-current" aria-label="Grafik tegangan dan arus"></canvas></div>
         </div>
-
-        <!-- Power Chart -->
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Grafik Daya</h3>
-            <div class="h-64 bg-gray-50 rounded flex items-center justify-center">
-                <p class="text-gray-500">Grafik akan ditampilkan di sini</p>
-            </div>
+            <div class="relative h-64"><canvas id="chart-power" aria-label="Grafik daya"></canvas></div>
         </div>
-
-        <!-- Irradiance Chart -->
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Grafik Irradiance</h3>
-            <div class="h-64 bg-gray-50 rounded flex items-center justify-center">
-                <p class="text-gray-500">Grafik akan ditampilkan di sini</p>
-            </div>
+            <div class="relative h-64"><canvas id="chart-irradiance" aria-label="Grafik irradiance"></canvas></div>
         </div>
     </div>
 
@@ -168,3 +153,69 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script>
+(function () {
+    const URL_DATA = @json(route('historical.chartData')) + window.location.search;
+
+    const line = (label, data, color) => ({
+        label, data, borderColor: color, backgroundColor: color + '22',
+        borderWidth: 2, pointRadius: 2, pointHoverRadius: 4, tension: 0.3, spanGaps: true,
+    });
+
+    const options = (yTitles) => {
+        const scales = {
+            x: { ticks: { maxTicksLimit: 10, autoSkip: true, maxRotation: 0 }, grid: { display: false } },
+            y: { title: { display: true, text: yTitles[0] } },
+        };
+        if (yTitles[1]) scales.y1 = { position: 'right', title: { display: true, text: yTitles[1] }, grid: { drawOnChartArea: false } };
+        return {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales, plugins: { legend: { position: 'bottom' } },
+        };
+    };
+
+    const showEmpty = (id) => {
+        const canvas = document.getElementById(id);
+        canvas.parentElement.innerHTML = '<div class="h-64 flex items-center justify-center text-gray-500 text-sm">Belum ada data untuk filter ini.</div>';
+    };
+
+    // Satu chart per kelompok sensor; yAxis menentukan sumbu untuk tiap seri
+    const build = (id, labels, datasets, sensors, yTitles) => {
+        const picked = datasets.filter((d) => sensors.includes(d.sensor));
+        const hasData = picked.some((d) => d.data.some((v) => v !== null));
+        if (!hasData) return showEmpty(id);
+        new Chart(document.getElementById(id), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: picked.map((d, i) => ({
+                    ...line(d.label, d.data, d.borderColor),
+                    yAxisID: i === 0 ? 'y' : 'y1',
+                })),
+            },
+            options: options(yTitles),
+        });
+    };
+
+    fetch(URL_DATA, { headers: { Accept: 'application/json' } })
+        .then((r) => r.json())
+        .then((json) => {
+            const { labels, datasets } = json;
+            build('chart-temperature', labels, datasets, ['temperature'], ['°C']);
+            build('chart-voltage-current', labels, datasets, ['voltage', 'current'], ['V', 'A']);
+            build('chart-power', labels, datasets, ['power'], ['W']);
+            build('chart-irradiance', labels, datasets, ['irradiance'], ['W/m²']);
+        })
+        .catch(() => {
+            ['chart-temperature', 'chart-voltage-current', 'chart-power', 'chart-irradiance'].forEach((id) => {
+                const c = document.getElementById(id);
+                c.parentElement.innerHTML = '<div class="h-64 flex items-center justify-center text-red-500 text-sm">Gagal memuat data grafik.</div>';
+            });
+        });
+})();
+</script>
+@endpush
