@@ -37,7 +37,6 @@ class DashboardController extends Controller
 
     /** Jumlah peringatan aktif yang ditampilkan di kartu dashboard. */
     private const ACTIVE_ALERT_LIMIT = 3;
-
     /** Nilai status peringatan untuk komponen <x-status-badge>. */
     private const ALERT_STATUS_KEYS = [
         Alert::STATUS_NEW => 'baru',

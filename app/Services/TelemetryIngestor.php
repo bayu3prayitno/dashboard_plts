@@ -24,14 +24,15 @@ class TelemetryIngestor
             'node_id' => ['required', 'integer', 'min:1'],
             'packet_no' => ['required', 'integer', 'min:0'],
             'recorded_at' => ['nullable', 'date'],
-            'temperature' => ['required', 'numeric', 'between:-999999,999999'],
-            'voltage' => ['required', 'numeric', 'between:-999999,999999'],
-            'current' => ['required', 'numeric', 'between:-999999,999999'],
-            'power' => ['required', 'numeric', 'between:-999999,999999'],
-            'irradiance' => ['required', 'numeric', 'between:-999999,999999'],
-            'rssi' => ['required', 'integer'],
-            'snr' => ['required', 'numeric', 'between:-999999,999999'],
-            'packet_loss' => ['required', 'numeric', 'between:0,100'],
+            // Field sensor boleh tidak ada; yang kosong disimpan sebagai null
+            'temperature' => ['nullable', 'numeric', 'between:-999999,999999'],
+            'voltage' => ['nullable', 'numeric', 'between:-999999,999999'],
+            'current' => ['nullable', 'numeric', 'between:-999999,999999'],
+            'power' => ['nullable', 'numeric', 'between:-999999,999999'],
+            'irradiance' => ['nullable', 'numeric', 'between:-999999,999999'],
+            'rssi' => ['nullable', 'integer'],
+            'snr' => ['nullable', 'numeric', 'between:-999999,999999'],
+            'packet_loss' => ['nullable', 'numeric', 'between:0,100'],
         ]);
 
         if ($validator->fails()) {
@@ -68,14 +69,14 @@ class TelemetryIngestor
             $now = now();
 
             $fields = [
-                'temperature' => $data['temperature'],
-                'voltage' => $data['voltage'],
-                'current' => $data['current'],
-                'power' => $data['power'],
-                'irradiance' => $data['irradiance'],
-                'rssi' => $data['rssi'],
-                'snr' => $data['snr'],
-                'packet_loss' => $data['packet_loss'],
+                'temperature' => $data['temperature'] ?? null,
+                'voltage' => $data['voltage'] ?? null,
+                'current' => $data['current'] ?? null,
+                'power' => $data['power'] ?? null,
+                'irradiance' => $data['irradiance'] ?? null,
+                'rssi' => $data['rssi'] ?? null,
+                'snr' => $data['snr'] ?? null,
+                'packet_loss' => $data['packet_loss'] ?? null,
                 'recorded_at' => $data['recorded_at'] ?? $now,
             ];
 

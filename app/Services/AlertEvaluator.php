@@ -24,6 +24,10 @@ class AlertEvaluator
                 continue;
             }
 
+            if ($measurement->{$sensor} === null) {
+                continue; // sensor tidak dikirim pada paket ini: jangan dibandingkan sebagai 0
+            }
+
             $value = (float) $measurement->{$sensor};
             [$type, $limit] = match (true) {
                 $value > (float) $threshold->max_value => [Alert::TYPE_THRESHOLD_HIGH, (float) $threshold->max_value],

@@ -138,7 +138,7 @@
                 <div class="flex justify-between gap-4 p-3 bg-gray-50 rounded"><span class="text-gray-600">MQTT_TOPIC</span><span class="text-gray-900 break-all text-right">{{ $device->gateway->mqttDataTopic() }}</span></div>
             </div>
 
-            <p class="text-sm text-gray-700 mt-6 mb-2">Format pesan JSON yang dikirim Node (nilai contoh):</p>
+            <p class="text-sm text-gray-700 mt-6 mb-2">Format pesan JSON yang diterbitkan Gateway ke MQTT (nilai contoh). Node mengirim data sensor dan packet_no; RSSI, SNR, dan packet loss diisi Gateway:</p>
             <pre class="bg-gray-900 text-green-300 text-xs p-4 rounded overflow-x-auto">{{ json_encode($samplePayload, JSON_PRETTY_PRINT) }}</pre>
             <p class="text-xs text-gray-500 mt-2">Kolom <span class="font-mono">node_id</span> harus sama dengan NODE_ID di atas. <span class="font-mono">packet_no</span> harus bertambah untuk setiap paket.</p>
         @else

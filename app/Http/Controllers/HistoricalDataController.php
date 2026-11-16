@@ -112,14 +112,14 @@ class HistoricalDataController extends Controller
                     $m->packet_no,
                     $m->device?->node_id,
                     $m->device?->name,
-                    (float) $m->temperature,
-                    (float) $m->voltage,
-                    (float) $m->current,
-                    (float) $m->power,
-                    (float) $m->irradiance,
+                    $this->num($m->temperature),
+                    $this->num($m->voltage),
+                    $this->num($m->current),
+                    $this->num($m->power),
+                    $this->num($m->irradiance),
                     $m->rssi,
-                    (float) $m->snr,
-                    (float) $m->packet_loss,
+                    $this->num($m->snr),
+                    $this->num($m->packet_loss),
                 ]);
             }
 
@@ -252,15 +252,21 @@ class HistoricalDataController extends Controller
             'device_id' => $m->device_id,
             'device_name' => $m->device?->name ?? '-',
             'node_id' => $m->device?->node_id,
-            'temperature' => (float) $m->temperature,
-            'voltage' => (float) $m->voltage,
-            'current' => (float) $m->current,
-            'power' => (float) $m->power,
-            'irradiance' => (float) $m->irradiance,
+            'temperature' => $this->num($m->temperature),
+            'voltage' => $this->num($m->voltage),
+            'current' => $this->num($m->current),
+            'power' => $this->num($m->power),
+            'irradiance' => $this->num($m->irradiance),
             'rssi' => $m->rssi,
-            'snr' => (float) $m->snr,
-            'packet_loss' => (float) $m->packet_loss,
+            'snr' => $this->num($m->snr),
+            'packet_loss' => $this->num($m->packet_loss),
         ];
+    }
+
+    /** Nilai sensor sebagai float; null bila tidak dikirim pada paket. */
+    private function num(mixed $value): ?float
+    {
+        return $value === null ? null : (float) $value;
     }
 
     private function localTimestamp(Measurement $m): string
