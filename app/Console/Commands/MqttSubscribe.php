@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Gateway;
 use App\Services\TelemetryIngestor;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use PhpMqtt\Client\ConnectionSettings;
 use PhpMqtt\Client\MqttClient;
@@ -18,6 +20,9 @@ class MqttSubscribe extends Command
     protected $signature = 'mqtt:subscribe';
 
     protected $description = 'Berlangganan MQTT dari Gateway dan menyimpan data sensor';
+
+    /** Interval heartbeat (detik) yang dibaca web untuk menentukan status MQTT. */
+    private const HEARTBEAT_INTERVAL = 5;
 
     public function handle(TelemetryIngestor $ingestor): int
     {
@@ -39,8 +44,19 @@ class MqttSubscribe extends Command
                     $this->handleMessage($topic, $message, $ingestor);
                 }, 0);
 
-                $client->loop(true);
+                // Loop manual agar heartbeat tetap dikirim selama menunggu pesan
+                $lastHeartbeat = 0.0;
+                while (true) {
+                    $client->loopOnce(microtime(true), true);
+
+                    if (microtime(true) - $lastHeartbeat >= self::HEARTBEAT_INTERVAL) {
+                        Cache::put(Gateway::MQTT_HEARTBEAT_KEY, time(), now()->addMinutes(10));
+                        $lastHeartbeat = microtime(true);
+                    }
+                }
             } catch (Throwable $e) {
+                // Tandai terputus di web segera, tanpa menunggu heartbeat kedaluwarsa
+                Cache::forget(Gateway::MQTT_HEARTBEAT_KEY);
                 Log::error('MQTT: koneksi terputus, mencoba lagi', ['error' => $e->getMessage()]);
                 $this->warn('Koneksi terputus: '.$e->getMessage().'. Mencoba lagi dalam 5 detik...');
                 sleep(5);

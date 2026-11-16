@@ -86,13 +86,9 @@ class TelemetryIngestor
                 'recorded_at' => $data['recorded_at'] ?? $now,
             ]);
 
-            // Data masuk berarti Node dan Gateway sedang aktif
+            // Status online/offline dan MQTT dihitung saat dibaca (lihat Gateway), hanya waktu terakhir yang disimpan
             $device->update(['last_seen_at' => $now]);
-            $gateway->update([
-                'last_seen_at' => $now,
-                'status' => 'online',
-                'mqtt_status' => 'connected',
-            ]);
+            $gateway->update(['last_seen_at' => $now]);
 
             $this->alerts->resolveOffline($device, $now);
             $this->alerts->evaluateMeasurement($device, $measurement);
