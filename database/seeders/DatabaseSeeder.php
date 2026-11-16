@@ -12,8 +12,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(GatewaySeeder::class);
-
         User::updateOrCreate(
             ['email' => 'superadmin@omahiot.example'],
             [

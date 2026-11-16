@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Gateway;
+use App\Services\GatewayStatusUpdater;
 use App\Services\TelemetryIngestor;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -27,7 +28,7 @@ class MqttSubscribe extends Command
     /** Seberapa sering (detik) kode diperiksa apakah sudah berubah. */
     private const CODE_CHECK_INTERVAL = 30;
 
-    public function handle(TelemetryIngestor $ingestor): int
+    public function handle(TelemetryIngestor $ingestor, GatewayStatusUpdater $statusUpdater): int
     {
         $config = config('mqtt');
         $codeVersion = $this->codeVersion();
@@ -48,6 +49,10 @@ class MqttSubscribe extends Command
 
                 $client->subscribe($config['topic'], function (string $topic, string $message) use ($ingestor) {
                     $this->handleMessage($topic, $message, $ingestor);
+                }, 0);
+
+                $client->subscribe($config['status_topic'], function (string $topic, string $message) use ($statusUpdater) {
+                    $this->handleStatus($topic, $message, $statusUpdater);
                 }, 0);
 
                 // Loop manual agar heartbeat tetap dikirim selama menunggu pesan
@@ -99,6 +104,25 @@ class MqttSubscribe extends Command
         }
 
         return $count.':'.$latest;
+    }
+
+    /** omahiot/gateway/{kode_gateway}/status: perbarui status internet gateway. */
+    private function handleStatus(string $topic, string $message, GatewayStatusUpdater $statusUpdater): void
+    {
+        $gatewayCode = explode('/', $topic)[2] ?? null;
+
+        $payload = json_decode($message, true);
+        if (! is_array($payload) || $gatewayCode === null) {
+            Log::warning('MQTT: pesan status bukan JSON yang valid', ['topic' => $topic]);
+
+            return;
+        }
+
+        try {
+            $statusUpdater->update($gatewayCode, $payload);
+        } catch (Throwable $e) {
+            Log::error('MQTT: gagal menyimpan status gateway', ['topic' => $topic, 'error' => $e->getMessage()]);
+        }
     }
 
     private function handleMessage(string $topic, string $message, TelemetryIngestor $ingestor): void

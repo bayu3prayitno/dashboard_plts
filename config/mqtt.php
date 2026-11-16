@@ -12,4 +12,7 @@ return [
     // Topik: omahiot/gateway/{kode_gateway}/data, mis. omahiot/gateway/GW-001/data
     // Kode gateway diambil dari segmen ke-3 topik.
     'topic' => env('MQTT_TOPIC', 'omahiot/gateway/+/data'),
+
+    // Status gateway (internet): omahiot/gateway/{kode_gateway}/status, isi {"internet": true|false}
+    'status_topic' => env('MQTT_STATUS_TOPIC', 'omahiot/gateway/+/status'),
 ];
