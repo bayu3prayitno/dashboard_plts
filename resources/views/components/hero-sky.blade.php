@@ -91,23 +91,33 @@
             return get('hour') * 60 + get('minute');
         };
 
-        // Lintasan busur di sekitar gambar rumah: terbit dari balik pohon kiri, melengkung di atas atap,
-        // terbenam di balik pohon kanan. Dihitung dari kotak gambar agar pas di semua ukuran layar.
-        // plts-3D.png: pohon kiri x≈0.08–0.20, pohon kanan x≈0.80–0.92, pucuk pohon tertinggi y≈0.19
-        const ARC = { left: 0.11, right: 0.89, horizon: 0.45, peak: 0.06 };
+        // Orbit elips mengelilingi rumah (searah jarum jam):
+        //   separuh atas  = kiri → melengkung di atas atap → kanan (terlihat)
+        //   separuh bawah = kanan → kembali ke kiri di BELAKANG rumah (tertutup gambar)
+        // Matahari & bulan berseberangan di orbit: saat satu di atas, yang lain di belakang rumah.
+        // Dihitung dari kotak gambar agar pas di semua ukuran layar.
+        // plts-3D.png: pohon kiri x≈0.08–0.20, pohon kanan x≈0.80–0.92, pucuk pohon y≈0.19, pagar y≈0.55
+        const ORBIT = { left: 0.03, right: 0.97, horizon: 0.45, peak: 0.06, back: 0.12 };
         const PEAK_CLEAR = +sky.dataset.peakClear || 0;
-        const place = (el, t) => {
+        // φ: 0 = terbit (kiri), π/2 = puncak, π = terbenam (kanan), 3π/2 = di belakang rumah
+        const place = (el, phi) => {
             const h = hero.getBoundingClientRect();
             const i = img.getBoundingClientRect();
             const ix = i.left - h.left, iy = i.top - h.top;
-            const x0 = ix + i.width * ARC.left, x1 = ix + i.width * ARC.right;
-            const yHorizon = iy + i.height * ARC.horizon;
-            const yPeak = Math.min(yHorizon - 40, Math.max(PEAK_CLEAR, iy + i.height * ARC.peak));
-            const alt = Math.sin(Math.PI * t);
-            const x = x0 + (x1 - x0) * t;
-            const y = yHorizon - (yHorizon - yPeak) * alt;
+            const x0 = ix + i.width * ORBIT.left, x1 = ix + i.width * ORBIT.right;
+            const cx = (x0 + x1) / 2, rx = (x1 - x0) / 2;
+            const yHorizon = iy + i.height * ORBIT.horizon;
+            const yPeak = Math.min(yHorizon - 40, Math.max(PEAK_CLEAR, iy + i.height * ORBIT.peak));
+            const alt = Math.sin(phi);                                  // >0 di atas cakrawala
+            const ry = alt >= 0 ? yHorizon - yPeak : i.height * ORBIT.back;
+            const x = cx - rx * Math.cos(phi);
+            const y = yHorizon - ry * alt;
             el.style.left = x + 'px';
             el.style.top = y + 'px';
+            // Memudar saat mendekati cakrawala: 0 tepat di cakrawala, penuh ±27 menit setelah terbit /
+            // sebelum terbenam. Mencegah matahari & bulan terlihat bersamaan saat senja/fajar, dan
+            // "bocor" lewat area transparan di tepi gambar saat lewat di belakang rumah.
+            el.style.opacity = clamp(alt / 0.12);
             // Dalam % agar bisa dipakai gradien cahaya
             return { x: (x / h.width) * 100, y: (y / h.height) * 100, alt };
         };
@@ -116,30 +126,25 @@
         const update = () => {
             const m = minutesNow();
             const isDay = m >= SUNRISE && m < SUNSET;
-            let moonPos = null;
 
-            if (isDay) {
-                const { x, y, alt } = place(sun, (m - SUNRISE) / (SUNSET - SUNRISE));
-                // Cahaya hangat siang mengikuti matahari
-                day.style.setProperty('--sun-x', x + '%');
-                day.style.setProperty('--sun-y', y + '%');
-                // Dekat cakrawala: matahari lebih jingga
-                sun.style.filter = `hue-rotate(${-18 * (1 - alt)}deg) saturate(${1 + 0.5 * (1 - alt)})`;
-                sun.style.opacity = 1;
-                moon.style.opacity = 0;
-                warm.style.setProperty('--glow-x', x + '%');
-            } else {
-                const nightLen = 24 * 60 - (SUNSET - SUNRISE);
-                moonPos = place(moon, ((m - SUNSET + 24 * 60) % (24 * 60)) / nightLen);
-                sun.style.opacity = 0;
-                moon.style.opacity = 1;
-            }
+            // Satu putaran orbit = 24 jam, matahari terbit di φ=0 pukul SUNRISE; bulan berseberangan (+π)
+            const phi = ((m - SUNRISE + 1440) % 1440) / 1440 * 2 * Math.PI;
+            const s = place(sun, phi);
+            place(moon, phi + Math.PI);
+
+            // Cahaya hangat siang mengikuti matahari
+            day.style.setProperty('--sun-x', s.x + '%');
+            day.style.setProperty('--sun-y', s.y + '%');
+            // Dekat cakrawala: matahari lebih jingga
+            const low = 1 - clamp(s.alt);
+            sun.style.filter = `hue-rotate(${-18 * low}deg) saturate(${1 + 0.5 * low})`;
+            // Cahaya fajar/senja di sisi tempat matahari terbit/terbenam
+            warm.style.setProperty('--glow-x', s.x + '%');
 
             // Jarak (menit) ke terbit/terbenam terdekat → intensitas fajar/senja
             const edge = Math.min(Math.abs(m - SUNRISE), Math.abs(m - SUNSET));
             const twilight = clamp(1 - edge / TWILIGHT);
             warm.style.opacity = isDay ? twilight : twilight * 0.6;
-            if (!isDay) warm.style.setProperty('--glow-x', moonPos.x + '%'); // sisa senja / fajar di sisi bulan
             const darkness = isDay ? 0 : clamp(0.35 + (1 - twilight) * 0.65);
             night.style.opacity = darkness;
             // Cahaya siang penuh di tengah hari, memudar saat fajar/senja agar jingga tetap terlihat

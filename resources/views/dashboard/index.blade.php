@@ -41,7 +41,7 @@
         <x-hero-sky :peak-clear="38" />
 
         <img data-hero-img src="{{ asset('images/plts-3D.png') }}" alt=""
-            class="pointer-events-none relative mx-auto -mb-2 h-64 object-contain sm:h-72 drop-shadow-xl select-none md:absolute md:top-1/2 md:left-[36%] md:mb-0 md:h-[112%] md:-translate-y-[46%] xl:left-[40%]">
+            class="pointer-events-none relative mx-auto -mb-2 h-64 object-contain sm:h-72 drop-shadow-xl select-none md:absolute md:top-1/2 md:left-[36%] md:mb-0 md:h-[112%] md:-translate-y-[41%] xl:left-[40%]">
 
         <div class="relative flex h-full flex-col gap-6 md:min-h-[19rem] md:justify-between">
             <div class="max-w-sm max-md:mx-auto max-md:text-center">
