@@ -96,7 +96,7 @@
         //   separuh bawah = kanan → kembali ke kiri di BELAKANG rumah (tertutup gambar)
         // Matahari & bulan berseberangan di orbit: saat satu di atas, yang lain di belakang rumah.
         // Dihitung dari kotak gambar agar pas di semua ukuran layar.
-        // plts-3D.png: pohon kiri x≈0.08–0.20, pohon kanan x≈0.80–0.92, pucuk pohon y≈0.19, pagar y≈0.55
+        // plts-3D.webp: pohon kiri x≈0.08–0.20, pohon kanan x≈0.80–0.92, pucuk pohon y≈0.19, pagar y≈0.55
         const ORBIT = { left: 0.03, right: 0.97, horizon: 0.45, peak: 0.06, back: 0.12 };
         const PEAK_CLEAR = +sky.dataset.peakClear || 0;
         // φ: 0 = terbit (kiri), π/2 = puncak, π = terbenam (kanan), 3π/2 = di belakang rumah

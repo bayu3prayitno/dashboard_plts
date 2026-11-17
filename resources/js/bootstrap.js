@@ -1,4 +1,1 @@
-import axios from 'axios';
-window.axios = axios;
-
-window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+// axios dihapus: tidak dipakai (semua request memakai fetch bawaan), tapi dulu ikut dimuat di setiap halaman.

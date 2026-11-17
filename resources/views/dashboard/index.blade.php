@@ -40,8 +40,9 @@
         {{-- Langit: matahari/bulan mengikuti jam (komponen dipakai juga di halaman login) --}}
         <x-hero-sky :peak-clear="38" />
 
-        <img data-hero-img src="{{ asset('images/plts-3D.png') }}" alt=""
-            class="pointer-events-none relative mx-auto -mb-2 h-64 object-contain sm:h-72 drop-shadow-xl select-none md:absolute md:top-1/2 md:left-[36%] md:mb-0 md:h-[112%] md:-translate-y-[41%] xl:left-[40%]">
+        {{-- WebP 1000px (134 KB) menggantikan PNG 1,6 MB; fetchpriority karena ini elemen terbesar di layar --}}
+        <img data-hero-img src="{{ asset('images/plts-3D.webp') }}" alt="" width="1000" height="1000" fetchpriority="high" decoding="async"
+            class="pointer-events-none relative mx-auto -mb-2 h-64 w-auto object-contain sm:h-72 drop-shadow-xl select-none md:absolute md:top-1/2 md:left-[36%] md:mb-0 md:h-[112%] md:-translate-y-[41%] xl:left-[40%]">
 
         <div class="relative flex h-full flex-col gap-6 md:min-h-[19rem] md:justify-between">
             <div class="max-w-sm max-md:mx-auto max-md:text-center">

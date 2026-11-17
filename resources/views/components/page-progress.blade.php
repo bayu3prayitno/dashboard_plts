@@ -43,14 +43,18 @@
     };
 
     // Halaman baru setelah navigasi: lanjutkan dari posisi tinggi lalu selesaikan
-    let pending = null;
-    try { pending = sessionStorage.getItem(KEY); } catch (e) {}
-    if (pending && Date.now() - +pending < 30000) {
+    const resume = () => {
+        let pending = null;
+        try { pending = sessionStorage.getItem(KEY); } catch (e) {}
+        if (!pending || Date.now() - +pending > 30000) return;
         root.style.opacity = 1;
         set(85, 0);
-        if (document.readyState === 'complete') done();
+        if (document.readyState === 'complete') requestAnimationFrame(done);
         else window.addEventListener('load', done, { once: true });
-    }
+    };
+    // Halaman hasil prerender (speculation rules) baru "aktif" saat link diklik
+    if (document.prerendering) document.addEventListener('prerenderingchange', resume, { once: true });
+    else resume();
 
     const skipLink = (a, e) => {
         if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return true;

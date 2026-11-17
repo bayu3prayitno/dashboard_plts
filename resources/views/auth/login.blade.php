@@ -24,8 +24,8 @@
             <span class="grid size-10 place-items-center rounded-2xl bg-primary text-lime"><x-logo :size="25" /></span>
             <span data-hero-title class="text-lg font-semibold transition-colors duration-1000">OmahIoT</span>
         </div>
-        <img data-hero-img src="{{ asset('images/plts-3D.png') }}" alt=""
-            class="pointer-events-none relative mx-auto max-h-[52vh] object-contain drop-shadow-xl select-none">
+        <img data-hero-img src="{{ asset('images/plts-3D.webp') }}" alt="" width="1000" height="1000" fetchpriority="high" decoding="async"
+            class="pointer-events-none relative mx-auto max-h-[52vh] w-auto object-contain drop-shadow-xl select-none">
         <div class="relative">
             <p data-hero-title class="max-w-md text-4xl leading-tight font-medium tracking-tight uppercase transition-colors duration-1000">Monitoring PLTS Cerdas</p>
             <p data-hero-subtitle class="mt-3 max-w-md text-sm text-muted transition-colors duration-1000">
