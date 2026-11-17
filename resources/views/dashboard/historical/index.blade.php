@@ -114,8 +114,10 @@
                 </tbody>
             </table>
         </div>
-        @if($paginator->hasPages())
-            <div class="border-t border-line px-4 py-3 text-sm text-muted">{{ $paginator->links() }}</div>
+        @if($paginator->lastPage() > 1)
+            <div class="flex justify-end border-t border-line px-4 py-3">
+                <x-pagination :paginator="$paginator" />
+            </div>
         @endif
     </section>
 
