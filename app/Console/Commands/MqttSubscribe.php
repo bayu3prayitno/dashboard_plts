@@ -62,12 +62,37 @@ class MqttSubscribe extends Command
                     $this->handleStatus($topic, $message, $statusUpdater);
                 }, 0);
 
-                // Loop manual agar heartbeat tetap dikirim selama menunggu pesan
+                // Loop dengan deteksi disconnect
                 $lastHeartbeat = 0.0;
                 $lastSettingsCheck = microtime(true);
                 $lastCodeCheck = microtime(true);
+                $isConnected = true;
+
                 while (true) {
-                    $client->loopOnce(microtime(true), true);
+                    try {
+                        // Jika disconnect terdeteksi, reconnect
+                        if (!$isConnected) {
+                            Log::info('MQTT: terdeteksi disconnect, mencoba reconnect...');
+                            $this->warn('Terdeteksi disconnect, mencoba reconnect...');
+                            $client->disconnect();
+                            $client->connect($settings, true);
+                            $client->subscribe($config['topic'], function (string $topic, string $message) use ($ingestor) {
+                                $this->handleMessage($topic, $message, $ingestor);
+                            }, 0);
+                            $client->subscribe($config['status_topic'], function (string $topic, string $message) use ($statusUpdater) {
+                                $this->handleStatus($topic, $message, $statusUpdater);
+                            }, 0);
+                            $isConnected = true;
+                            $this->info('Reconnect berhasil');
+                        }
+
+                        // Gunakan loop dengan timeout 100ms agar responsif
+                        $client->loopOnce(100, true);
+                        $isConnected = true;
+                    } catch (Throwable $e) {
+                        Log::warning('MQTT: loopOnce error', ['error' => $e->getMessage()]);
+                        $isConnected = false;
+                    }
 
                     if (microtime(true) - $lastHeartbeat >= self::HEARTBEAT_INTERVAL) {
                         Cache::put(Gateway::MQTT_HEARTBEAT_KEY, time(), now()->addMinutes(10));
