@@ -7,15 +7,26 @@
 @section('content')
 <div class="space-y-6">
     <!-- Action Bar -->
-    <div class="flex justify-between items-center">
+    <form method="GET" action="{{ route('devices.index') }}" class="flex justify-between items-center gap-3">
         <div class="flex gap-3">
-            <input type="text" placeholder="Cari perangkat..." class="px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary">
-            <select class="px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary">
-                <option>Semua Status</option>
-                <option>Online</option>
-                <option>Offline</option>
-                <option>Nonaktif</option>
+            <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari nama/lokasi/node ID..."
+                   class="px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary w-72">
+            <select name="status" onchange="this.form.submit()"
+                    class="px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary">
+                <option value="">Semua Status</option>
+                <option value="online" @selected(request('status') === 'online')>Online</option>
+                <option value="offline" @selected(request('status') === 'offline')>Offline</option>
+                <option value="inactive" @selected(request('status') === 'inactive')>Nonaktif</option>
             </select>
+            <button type="submit" class="btn btn-outline flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                Cari
+            </button>
+            @if(request('search') || request('status'))
+                <a href="{{ route('devices.index') }}" class="btn btn-outline text-muted">Reset</a>
+            @endif
         </div>
         <a href="{{ route('devices.create') }}" class="btn btn-primary flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -23,7 +34,7 @@
             </svg>
             Tambah Perangkat
         </a>
-    </div>
+    </form>
 
     <!-- Devices Table -->
     <div class="card overflow-hidden p-0">

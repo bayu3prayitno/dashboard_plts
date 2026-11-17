@@ -14,9 +14,39 @@ use Illuminate\View\View;
 
 class DeviceController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $devices = Device::with('gateway')->orderBy('node_id')->paginate(10);
+        $query = Device::with('gateway');
+
+        // Filter berdasarkan search query (nama, lokasi, atau node_id)
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('location', 'like', "%{$search}%")
+                  ->orWhere('node_id', '=', is_numeric($search) ? (int) $search : -1);
+            });
+        }
+
+        // Filter berdasarkan status (online/offline/inactive)
+        if ($status = $request->input('status')) {
+            if ($status === 'online') {
+                // Online: is_active=true dan last_seen_at masih dalam timeout (~5 menit)
+                $query->where('is_active', true)
+                      ->where('last_seen_at', '>=', now()->subMinutes(5));
+            } elseif ($status === 'offline') {
+                // Offline: is_active=true tapi last_seen_at sudah lama atau null
+                $query->where('is_active', true)
+                      ->where(function ($q) {
+                          $q->whereNull('last_seen_at')
+                            ->orWhere('last_seen_at', '<', now()->subMinutes(5));
+                      });
+            } elseif ($status === 'inactive') {
+                // Inactive: is_active=false
+                $query->where('is_active', false);
+            }
+        }
+
+        $devices = $query->orderBy('node_id')->paginate(10)->appends($request->query());
 
         return view('dashboard.devices.index', ['devices' => $devices]);
     }
