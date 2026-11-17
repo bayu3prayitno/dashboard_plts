@@ -6,8 +6,10 @@ use App\Models\Alert;
 use App\Models\Device;
 use App\Models\Gateway;
 use App\Models\Setting;
+use App\Support\SettingsCache;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -22,7 +24,7 @@ class DashboardController extends Controller
     /** Zona waktu tampilan dari pengaturan sistem (default Asia/Jakarta). Penyimpanan tetap UTC. */
     public static function tz(): string
     {
-        $value = Setting::find('timezone')?->value;
+        $value = SettingsCache::get('timezone', 'Asia/Jakarta');
 
         return in_array($value, SettingsController::TIMEZONES, true) ? $value : 'Asia/Jakarta';
     }
@@ -60,20 +62,21 @@ class DashboardController extends Controller
         $offline = count(array_filter($devices, fn ($d) => $d['status'] === Device::STATUS_OFFLINE));
         $avg = fn (string $key) => $this->average(array_column(array_column($online, 'latest'), $key));
 
-        // Tren: satu garis per perangkat aktif (id => nama)
         $activeDevices = [];
         foreach ($devices as $d) {
             if ($d['aktif']) {
                 $activeDevices[$d['id']] = $d['nama'];
             }
         }
-        $trend = $this->trend($activeDevices, $now);
+
+        $trend = Cache::remember('dashboard_trend_' . $now->format('Y-m-d-H'), 300,
+            fn () => $this->trend($activeDevices, $now)
+        );
 
         $powerNow = $avg('power');
         $powerPeak = max(array_map(fn ($p) => $p['value'] ?? 0, $trend['avg']['power']['24h']));
         $powerShare = $powerNow !== null && $powerPeak > 0 ? min(100, $powerNow / $powerPeak * 100) : 0;
 
-        // Kualitas link: perangkat aktif yang sudah pernah mengirim data
         $links = array_values(array_filter($devices, fn ($d) => $d['aktif'] && $d['packet_loss'] !== null));
         $received = $this->average(array_map(fn ($d) => 100 - $d['packet_loss'], $links));
 
@@ -121,6 +124,12 @@ class DashboardController extends Controller
     /** Pengukuran terakhir tiap perangkat, dikunci dengan device_id. */
     private function latestMeasurements(): Collection
     {
+        $driver = DB::getDriverName();
+
+        if ($driver === 'mysql') {
+            return $this->latestMeasurementsMySQL();
+        }
+
         return DB::table('measurements as m')
             ->joinSub(
                 DB::table('measurements')
@@ -134,6 +143,22 @@ class DashboardController extends Controller
             ->select('m.*')
             ->get()
             ->unique('device_id')
+            ->keyBy('device_id');
+    }
+
+    private function latestMeasurementsMySQL(): Collection
+    {
+        return DB::table(DB::raw(<<<'SQL'
+            (SELECT * FROM measurements
+             WHERE (device_id, recorded_at) IN (
+                SELECT device_id, MAX(recorded_at)
+                FROM measurements
+                GROUP BY device_id
+             )) AS m
+        SQL
+        ))
+            ->select('m.*')
+            ->get()
             ->keyBy('device_id');
     }
 
@@ -325,7 +350,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'devices' => $devices,
-            'alerts' => $this->activeAlerts(),
+            'alerts' => Cache::remember('dashboard_alerts_live', 30, fn () => $this->activeAlerts()),
             'onlineCount' => count($online),
             'offlineCount' => count($devices) - count($online),
             'powerNow' => $avg('power'),

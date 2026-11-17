@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\SettingsCache;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -35,7 +36,7 @@ class Device extends Model
     /** Timeout offline dalam menit, dari tabel settings (key: offline_timeout_minutes). */
     public static function offlineTimeoutMinutes(): int
     {
-        $value = Setting::find('offline_timeout_minutes')?->value;
+        $value = SettingsCache::get('offline_timeout_minutes', (string) self::DEFAULT_OFFLINE_TIMEOUT_MINUTES);
 
         return is_numeric($value) ? (int) $value : self::DEFAULT_OFFLINE_TIMEOUT_MINUTES;
     }

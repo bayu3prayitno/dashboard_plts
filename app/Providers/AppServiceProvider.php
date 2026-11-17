@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\Alert;
 use App\Models\Device;
+use App\Models\Setting;
+use App\Observers\SettingObserver;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use App\Http\Controllers\DashboardController;
@@ -23,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Setting::observe(SettingObserver::class);
+
         // Data untuk header & sidebar
         View::composer('layouts.app', function ($view) {
             $openAlerts = Alert::query()->open()->with('device:id,name')->latest('triggered_at')->get();
