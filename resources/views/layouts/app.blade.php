@@ -61,8 +61,9 @@
                     <x-icon :name="$item['icon']" :size="19" />
                     <span class="nav-label">{{ $item['label'] }}</span>
                     <span class="nav-hint">{{ $item['label'] }}</span>
-                    @if (($item['badge'] ?? 0) > 0)
-                        <span class="nav-badge">{{ $item['badge'] }}</span>
+                    @if (array_key_exists('badge', $item))
+                        {{-- Selalu dirender (disembunyikan saat 0) agar bisa diperbarui real-time --}}
+                        <span data-alert-badge class="nav-badge {{ $item['badge'] > 0 ? '' : 'hidden' }}">{{ $item['badge'] }}</span>
                     @endif
                 </a>
             @endforeach
@@ -132,12 +133,11 @@
                     <button type="button" data-toggle aria-label="Notifikasi, {{ $layoutFreshCount }} peringatan baru"
                         class="relative grid size-10 place-items-center rounded-full bg-white shadow-sm hover:bg-primary-soft">
                         <x-icon name="bell" :size="18" />
-                        @if ($layoutFreshCount > 0)
-                            <span class="absolute -top-0.5 -right-0.5 grid size-4.5 place-items-center rounded-full bg-red-600 text-[10px] font-semibold text-white">{{ $layoutFreshCount }}</span>
-                        @endif
+                        <span data-bell-count class="absolute -top-0.5 -right-0.5 grid size-4.5 place-items-center rounded-full bg-red-600 text-[10px] font-semibold text-white {{ $layoutFreshCount > 0 ? '' : 'hidden' }}">{{ $layoutFreshCount }}</span>
                     </button>
                     <div data-panel class="absolute right-0 z-30 mt-2 hidden w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-line border-gray-200 bg-white p-2 shadow-lg">
                         <p class="px-3 py-2 text-sm font-semibold">Peringatan baru</p>
+                        <div data-notif-list>
                         @forelse ($layoutFreshAlerts as $a)
                             <a href="{{ route('alerts.index') }}" class="block px-3 py-2 hover:bg-canvas border-t border-gray-200 first:border-t-0 ">
                                 <p class="block text-sm font-medium">{{ $a['category'] }}.  <span class="text-[10px] text-muted font-italic">{{ \App\Support\Format::relTime($a['waktu']) }}</span></p>
@@ -146,6 +146,7 @@
                         @empty
                             <p class="px-3 pb-3 text-sm text-muted">Tidak ada peringatan baru.</p>
                         @endforelse
+                        </div>
                     </div>
                 </div>
             </div>
@@ -253,30 +254,171 @@
     setInterval(updateClock, 1000);
 })();
 
-// Toast peringatan baru: polling ringan tiap 30 detik, hanya saat tab terlihat.
-// id terakhir disimpan per tab agar pindah halaman tidak memicu request tambahan/toast ganda.
+// Notifikasi real-time tanpa refresh (badge sidebar, angka lonceng, isi panel, toast).
+// Super ringan: browser mengirim versi data alert yang dimilikinya; bila tidak ada perubahan,
+// server menjawab 204 kosong TANPA query database. Data baru hanya dikirim saat memang berubah.
+// Hanya berjalan saat tab terlihat; saat tab kembali aktif langsung dicek.
 (function () {
-    const KEY = 'alertLastId';
-    const INTERVAL = 30000;
-    let lastId = null;
-    try { lastId = sessionStorage.getItem(KEY); } catch (e) {}
+    const URL_LIVE = @js(route('api.live.alerts'));
+    const INTERVAL = 15000;
+    const LAST_KEY = 'alertLastId'; // dibagi antar-tab (localStorage) agar toast tidak muncul ganda
+    const ALERTS_URL = @js(route('alerts.index'));
+    let version = @js(\App\Models\Alert::version()); // versi saat halaman dirender
+    let busy = false, lastPoll = 0;
 
-    const poll = async () => {
-        if (document.hidden) return;
-        try {
-            const res = await fetch('{{ route('api.live.alerts') }}' + (lastId ? '?after=' + lastId : ''),
-                { headers: { Accept: 'application/json' } });
-            if (!res.ok) return;
-            const data = await res.json();
-            data.alerts.forEach((a) => showToast(`🚨 ${a.device}: ${a.message}`, 'error'));
-            lastId = data.last_id;
-            try { sessionStorage.setItem(KEY, lastId); } catch (e) {}
-        } catch (e) {}
+    const store = {
+        get() { try { return localStorage.getItem(LAST_KEY); } catch (e) { return null; } },
+        set(v) { try { localStorage.setItem(LAST_KEY, v); } catch (e) {} },
+    };
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const relTime = (iso) => {
+        if (!iso) return 'belum ada data';
+        const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+        if (min < 1) return 'baru saja';
+        if (min < 60) return `${min} menit lalu`;
+        const h = Math.floor(min / 60);
+        return h < 24 ? `${h} jam lalu` : `${Math.floor(h / 24)} hari lalu`;
     };
 
-    // Kunjungan pertama tab: ambil titik awal. Setelahnya cukup tunggu interval.
-    if (!lastId) setTimeout(poll, 3000);
+    // ---- Angka lonceng & badge sidebar ----
+    const bellCount = document.querySelector('[data-bell-count]');
+    const bellBtn = bellCount?.closest('[data-toggle]');
+    const setBell = (n, pop = false) => {
+        if (!bellCount) return;
+        bellCount.textContent = n;
+        bellCount.classList.toggle('hidden', n < 1);
+        bellBtn?.setAttribute('aria-label', `Notifikasi, ${n} peringatan baru`);
+        if (pop && n > 0 && !reduceMotion()) {
+            bellCount.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.6)' }, { transform: 'scale(1)' }],
+                { duration: 380, easing: 'cubic-bezier(.3,1.6,.5,1)' });
+            bellBtn?.animate([{ rotate: '0deg' }, { rotate: '-14deg' }, { rotate: '12deg' }, { rotate: '-8deg' }, { rotate: '0deg' }],
+                { duration: 520, easing: 'ease-in-out' });
+        }
+    };
+    const setSidebarBadge = (n) => document.querySelectorAll('[data-alert-badge]').forEach((el) => {
+        el.textContent = n;
+        el.classList.toggle('hidden', n < 1);
+    });
+    const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    // ---- Kartu notifikasi: geser masuk dari kanan → tampil → terbang masuk ke lonceng ----
+    const BELL_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>';
+    const flyIn = async ({ title, device, message }) => {
+        const card = document.createElement('div');
+        card.setAttribute('role', 'status');
+        card.className = 'fixed top-20 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] cursor-pointer rounded-2xl border border-red-100 bg-white p-4 shadow-xl shadow-black/10';
+        card.innerHTML = `<div class="flex items-start gap-3">
+                <span class="grid size-9 shrink-0 place-items-center rounded-full bg-red-100 text-red-600">${BELL_SVG}</span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-ink">${esc(title)}</p>
+                    <p class="mt-0.5 break-words text-xs text-muted">${device ? `<span class="font-semibold text-ink">${esc(device)}:</span> ` : ''}${esc(message)}</p>
+                </div></div>`;
+        card.addEventListener('click', () => { window.location.href = ALERTS_URL; });
+        let hovered = false;
+        card.addEventListener('mouseenter', () => { hovered = true; });
+        card.addEventListener('mouseleave', () => { hovered = false; });
+        document.body.appendChild(card);
+
+        if (reduceMotion()) {
+            await wait(2600);
+            card.remove();
+            return;
+        }
+
+        // 1) Geser masuk dari kanan
+        await card.animate([{ transform: 'translateX(calc(100% + 2rem))', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }],
+            { duration: 450, easing: 'cubic-bezier(.2,.9,.3,1.15)' }).finished;
+        // 2) Tampil sebentar (ditahan selama kursor di atas kartu)
+        await wait(2600);
+        while (hovered) await wait(200);
+
+        // 3) Terbang masuk ke lonceng (bila lonceng terlihat), lalu hilang
+        const from = card.getBoundingClientRect();
+        const to = bellBtn?.getBoundingClientRect();
+        const keyframes = to && to.width
+            ? [
+                { transform: 'translate(0,0) scale(1)', opacity: 1, borderRadius: '1rem' },
+                { transform: `translate(${to.left + to.width / 2 - (from.left + from.width / 2)}px, ${to.top + to.height / 2 - (from.top + from.height / 2)}px) scale(0.08)`, opacity: 0.2, borderRadius: '50%' },
+            ]
+            : [{ opacity: 1 }, { opacity: 0, transform: 'translateX(2rem)' }];
+        await card.animate(keyframes, { duration: 600, easing: 'cubic-bezier(.55,0,.75,.25)', fill: 'forwards' }).finished;
+        card.remove();
+    };
+
+    // Antrian: kartu tampil bergantian; angka lonceng naik satu per satu tiap kartu masuk
+    const playArrivals = async (alerts, target) => {
+        let shown = +(bellCount?.textContent || 0);
+        const list = alerts.slice(0, 3);
+        for (const a of list) {
+            await flyIn({ title: 'Peringatan baru', device: a.device, message: a.message });
+            setBell(Math.min(++shown, target), true);
+        }
+        if (alerts.length > 3) {
+            await flyIn({ title: `+${alerts.length - 3} peringatan baru lainnya`, message: 'Buka halaman Peringatan untuk melihat semuanya.' });
+            setBell(target, true);
+        }
+    };
+
+    const render = (data) => {
+        const list = document.querySelector('[data-notif-list]');
+        if (list) {
+            list.innerHTML = data.panel.length
+                ? data.panel.map((a) => `<a href="${esc(ALERTS_URL)}" class="block px-3 py-2 hover:bg-canvas border-t border-gray-200 first:border-t-0">
+                        <p class="block text-sm font-medium">${esc(a.category)}.  <span class="text-[10px] text-muted">${esc(relTime(a.time))}</span></p>
+                        <p class="block text-xs text-muted"><span class="font-bold">${esc(a.device)}: </span> ${esc(a.text)}.</p></a>`).join('')
+                : '<p class="px-3 pb-3 text-sm text-muted">Tidak ada peringatan baru.</p>';
+        }
+        // Halaman lain (mis. dashboard) bisa ikut memperbarui diri: window.addEventListener('alerts:changed', ...)
+        window.dispatchEvent(new CustomEvent('alerts:changed', { detail: data }));
+    };
+
+    const poll = async () => {
+        if (busy || document.hidden || document.prerendering) return;
+        busy = true;
+        lastPoll = Date.now();
+        try {
+            const lastId = store.get();
+            const params = new URLSearchParams();
+            // Tanpa lastId (pertama kali di browser ini): minta titik awal, jangan pakai versi agar tidak 204
+            if (lastId) { params.set('v', version); params.set('after', lastId); }
+            const res = await fetch(`${URL_LIVE}?${params}`, { headers: { Accept: 'application/json' } });
+            if (res.status === 204 || !res.ok) return;
+            const data = await res.json();
+
+            version = data.v;
+            // Toast hanya untuk alert yang belum pernah di-toast di tab mana pun (dibaca ulang: tab lain mungkin lebih dulu)
+            const seen = +(store.get() || 0);
+            const fresh = lastId ? data.alerts.filter((a) => a.id > seen) : [];
+            if (data.last_id > seen) store.set(data.last_id);
+
+            render(data); // isi panel lonceng langsung diperbarui (panel tertutup, tidak terlihat)
+            // Angka lonceng & badge sidebar baru bertambah SETELAH kartu notifikasi masuk ke lonceng
+            if (fresh.length && !document.hidden) await playArrivals(fresh, data.fresh);
+            setBell(data.fresh);
+            setSidebarBadge(data.open);
+        } catch (e) {
+            // jaringan putus: coba lagi pada interval berikutnya
+        } finally {
+            busy = false;
+        }
+    };
+
+    @if (app()->isLocal())
+    // DEV ONLY: pratinjau animasi dari console browser → demoNotif() atau demoNotif(3)
+    window.demoNotif = async (n = 1) => {
+        const before = +(bellCount?.textContent || 0);
+        const samples = Array.from({ length: n }, (_, i) => ({ device: `Node Sensor ${i + 1}`, message: 'Suhu 99°C di atas ambang 35°C (demo)' }));
+        await playArrivals(samples, before + n);
+        await wait(2500);
+        setBell(before); // kembalikan angka asli
+    };
+    @endif
+
     setInterval(poll, INTERVAL);
+    // Kembali ke tab ini: langsung cek (dibatasi agar tidak spam saat berpindah tab cepat)
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastPoll > 5000) poll(); });
+    if (!store.get()) setTimeout(poll, 2000);
 })();
 </script>
 {{-- Modal konfirmasi (global): pengganti window.confirm(). Pakai: if (await confirmDialog({...})) { ... } --}}

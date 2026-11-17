@@ -65,7 +65,7 @@ class AlertEvaluator
     /** Data masuk lagi: tutup alert offline yang masih terbuka untuk perangkat ini. */
     public function resolveOffline(Device $device, CarbonInterface $at): void
     {
-        Alert::query()->open()
+        $resolved = Alert::query()->open()
             ->where('device_id', $device->id)
             ->where('alert_type', Alert::TYPE_OFFLINE)
             ->update([
@@ -74,6 +74,11 @@ class AlertEvaluator
                 'resolution_note' => 'Perangkat kembali mengirim data.',
                 'updated_at' => $at,
             ]);
+
+        // Mass update tidak memicu event model: beri tahu notifikasi real-time secara manual
+        if ($resolved > 0) {
+            Alert::bumpVersion();
+        }
     }
 
     /**

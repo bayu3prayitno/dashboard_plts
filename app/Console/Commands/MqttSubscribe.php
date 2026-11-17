@@ -148,24 +148,25 @@ class MqttSubscribe extends Command
         }
     }
 
-    /** Sidik jari kode MQTT saja: hanya file di app/Console/Commands dan app/Services (bukan seluruh app). */
+    /**
+     * Sidik jari kode yang dipakai subscriber: command ini + semua Service + semua Model
+     * (mis. Alert & AlertEvaluator ikut dimuat saat menyimpan data). Cukup ±20 file, ringan.
+     */
     private function codeVersion(): string
     {
-        $count = 0;
+        $files = array_merge(
+            [base_path('app/Console/Commands/MqttSubscribe.php')],
+            glob(base_path('app/Services/*.php')) ?: [],
+            glob(base_path('app/Models/*.php')) ?: [],
+            glob(base_path('app/Support/*.php')) ?: [],
+        );
+
         $latest = 0;
-        foreach ([
-            base_path('app/Console/Commands/MqttSubscribe.php'),
-            base_path('app/Services/MqttSettings.php'),
-            base_path('app/Services/TelemetryIngestor.php'),
-            base_path('app/Services/GatewayStatusUpdater.php'),
-        ] as $file) {
-            if (file_exists($file)) {
-                $count++;
-                $latest = max($latest, filemtime($file));
-            }
+        foreach ($files as $file) {
+            $latest = max($latest, (int) @filemtime($file));
         }
 
-        return $count.':'.$latest;
+        return count($files).':'.$latest;
     }
 
     /** omahiot/gateway/{kode_gateway}/status: perbarui status internet gateway. */

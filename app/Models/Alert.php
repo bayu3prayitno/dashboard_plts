@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
+use Throwable;
 
 #[Fillable(['device_id', 'handled_by', 'alert_type', 'sensor_type', 'recorded_value', 'threshold_value', 'status', 'resolution_note', 'triggered_at', 'resolved_at'])]
 class Alert extends Model
@@ -21,6 +23,45 @@ class Alert extends Model
     public const STATUS_ACKNOWLEDGED = 'acknowledged';
 
     public const STATUS_RESOLVED = 'resolved';
+
+    /** Kunci cache penanda versi data alert (berubah setiap ada alert dibuat/diubah/dihapus). */
+    public const VERSION_KEY = 'alerts:version';
+
+    protected static function booted(): void
+    {
+        // Notifikasi real-time: browser cukup membandingkan versi ini (tanpa query DB) untuk tahu ada perubahan
+        static::saved(fn () => self::bumpVersion());
+        static::deleted(fn () => self::bumpVersion());
+    }
+
+    /**
+     * Tandai data alert berubah. Panggil manual setelah mass update (query()->update()),
+     * karena mass update tidak memicu event model.
+     */
+    public static function bumpVersion(): void
+    {
+        try {
+            Cache::forever(self::VERSION_KEY, sprintf('%d-%04d', (int) (microtime(true) * 1000), random_int(0, 9999)));
+        } catch (Throwable) {
+            // Cache tidak tersedia: notifikasi tetap tersusul pada perubahan berikutnya
+        }
+    }
+
+    /** Versi data alert saat ini (dibaca dari cache, tanpa query database). */
+    public static function version(): string
+    {
+        try {
+            $version = Cache::get(self::VERSION_KEY);
+            if ($version === null) {
+                self::bumpVersion();
+                $version = Cache::get(self::VERSION_KEY, '0');
+            }
+
+            return (string) $version;
+        } catch (Throwable) {
+            return '0';
+        }
+    }
 
     /**
      * Get the attributes that should be cast.

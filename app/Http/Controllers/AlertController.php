@@ -131,27 +131,53 @@ class AlertController extends Controller
         return redirect()->route('alerts.configuration')->with('success', 'Konfigurasi alert disimpan.');
     }
 
-    /** SSE: stream alert baru real-time ke client. */
     /**
-     * Polling ringan untuk toast peringatan baru (menggantikan SSE yang menahan worker server).
-     * Tanpa ?after → hanya mengembalikan id terakhir sebagai titik awal (tanpa toast).
+     * Notifikasi real-time lewat polling super ringan.
+     *
+     * ?v=<versi>  : versi yang dimiliki browser. Bila sama dengan versi server → 204 tanpa query DB.
+     * ?after=<id> : id alert terakhir yang sudah di-toast. Tanpa ini → hanya titik awal (tanpa toast).
+     *
+     * Bila berubah, mengembalikan versi baru, jumlah badge, isi panel notifikasi, dan alert baru untuk toast.
      */
-    public function liveStream(Request $request): \Illuminate\Http\JsonResponse
+    public function liveStream(Request $request): \Illuminate\Http\Response|JsonResponse
     {
-        if (! $request->filled('after')) {
-            return response()->json(['last_id' => (int) Alert::query()->max('id'), 'alerts' => []]);
+        $version = Alert::version();
+        if ($request->query('v') === $version) {
+            return response()->noContent(); // tidak ada perubahan: 0 query
         }
 
-        $alerts = Alert::query()
-            ->where('id', '>', (int) $request->query('after'))
+        $counts = Alert::query()->open()
+            ->selectRaw('COUNT(*) AS open_count, COALESCE(SUM(status = ?), 0) AS fresh_count', [Alert::STATUS_NEW])
+            ->first();
+
+        $panel = (int) $counts->fresh_count === 0 ? collect() : Alert::query()
+            ->where('status', Alert::STATUS_NEW)
+            ->with('device:id,name')
+            ->latest('triggered_at')
+            ->limit(5)
+            ->get();
+
+        $after = $request->filled('after') ? (int) $request->query('after') : null;
+        $new = $after === null ? collect() : Alert::query()
+            ->where('id', '>', $after)
             ->with('device:id,name')
             ->orderBy('id')
             ->limit(10)
             ->get();
 
         return response()->json([
-            'last_id' => (int) ($alerts->last()?->id ?? $request->query('after')),
-            'alerts' => $alerts->map(fn (Alert $a) => [
+            'v' => $version,
+            'last_id' => (int) ($new->last()?->id ?? $after ?? Alert::query()->max('id')),
+            'open' => (int) $counts->open_count,
+            'fresh' => (int) $counts->fresh_count,
+            'panel' => $panel->map(fn (Alert $a) => [
+                'category' => $a->typeLabel(),
+                'device' => $a->device?->name ?? '-',
+                'text' => $a->message(),
+                'time' => $a->triggered_at?->toIso8601String(),
+            ])->values(),
+            'alerts' => $new->map(fn (Alert $a) => [
+                'id' => $a->id,
                 'device' => $a->device?->name ?? '-',
                 'message' => $a->message(),
             ])->values(),
