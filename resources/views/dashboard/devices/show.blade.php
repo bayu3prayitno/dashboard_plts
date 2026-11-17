@@ -119,7 +119,8 @@
 
         @if($device->gateway)
             @php
-                $samplePayload = [
+                // Node hanya mengirim nomor paket dan data sensor
+                $nodePayload = [
                     'node_id' => $device->node_id,
                     'packet_no' => 1,
                     'temperature' => 28.5,
@@ -127,6 +128,9 @@
                     'current' => 1.2,
                     'power' => 14.5,
                     'irradiance' => 650,
+                ];
+                // Gateway menambahkan RSSI, SNR, dan packet loss sebelum menerbitkan ke MQTT
+                $mqttPayload = $nodePayload + [
                     'rssi' => -72,
                     'snr' => 8.5,
                     'packet_loss' => 0,
@@ -138,8 +142,11 @@
                 <div class="flex justify-between gap-4 p-3 bg-gray-50 rounded"><span class="text-gray-600">MQTT_TOPIC</span><span class="text-gray-900 break-all text-right">{{ $device->gateway->mqttDataTopic() }}</span></div>
             </div>
 
-            <p class="text-sm text-gray-700 mt-6 mb-2">Format pesan JSON yang diterbitkan Gateway ke MQTT (nilai contoh). Node mengirim data sensor dan packet_no; RSSI, SNR, dan packet loss diisi Gateway:</p>
-            <pre class="bg-gray-900 text-green-300 text-xs p-4 rounded overflow-x-auto">{{ json_encode($samplePayload, JSON_PRETTY_PRINT) }}</pre>
+            <p class="text-sm text-gray-700 mt-6 mb-2">Pesan yang dikirim Node via LoRa (nilai contoh):</p>
+            <pre class="bg-gray-900 text-green-300 text-xs p-4 rounded overflow-x-auto">{{ json_encode($nodePayload, JSON_PRETTY_PRINT) }}</pre>
+
+            <p class="text-sm text-gray-700 mt-6 mb-2">Pesan yang diterbitkan Gateway ke MQTT (nilai contoh). RSSI, SNR, dan packet loss ditambahkan Gateway:</p>
+            <pre class="bg-gray-900 text-green-300 text-xs p-4 rounded overflow-x-auto">{{ json_encode($mqttPayload, JSON_PRETTY_PRINT) }}</pre>
             <p class="text-xs text-gray-500 mt-2">Kolom <span class="font-mono">node_id</span> harus sama dengan NODE_ID di atas. <span class="font-mono">packet_no</span> harus bertambah untuk setiap paket.</p>
         @else
             <p class="text-sm text-gray-500">Perangkat belum terhubung ke Gateway. Edit perangkat dan pilih Gateway untuk melihat konfigurasi.</p>

@@ -7,6 +7,7 @@ use App\Models\Device;
 use App\Models\Gateway;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\MqttSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -51,7 +52,85 @@ class SettingsTest extends TestCase
             ->assertOk()
             ->assertSee('Asia/Jakarta')
             ->assertSee('value="90"', false)
-            ->assertDontSee('MQTT');
+            ->assertSee('Broker MQTT')
+            ->assertDontSee('mqtt_topic');
+    }
+
+    public function test_mqtt_topics_are_fixed_and_not_editable_from_menu(): void
+    {
+        $this->actingAs($this->user)
+            ->post(route('settings.mqttUpdate'), $this->mqttPayload(['mqtt_topic' => 'lain/topik', 'mqtt_status_topic' => 'lain/status']))
+            ->assertSessionHasNoErrors();
+
+        $config = MqttSettings::current();
+        $this->assertSame('omahiot/gateway/+/data', $config['topic']);
+        $this->assertSame('omahiot/gateway/+/status', $config['status_topic']);
+        $this->assertNull(Setting::find('mqtt_topic'));
+    }
+
+    /** @return array<string, mixed> */
+    private function mqttPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'mqtt_host' => '10.0.0.5',
+            'mqtt_port' => 8883,
+            'mqtt_username' => 'omah',
+            'mqtt_password' => 'rahasia-123',
+            'mqtt_tls' => '1',
+        ], $overrides);
+    }
+
+    public function test_mqtt_settings_saved_here_are_used_by_subscriber_config(): void
+    {
+        $this->actingAs($this->user)
+            ->post(route('settings.mqttUpdate'), $this->mqttPayload())
+            ->assertRedirect(route('settings.system'))
+            ->assertSessionHas('success');
+
+        $config = MqttSettings::current();
+        $this->assertSame('10.0.0.5', $config['host']);
+        $this->assertSame(8883, $config['port']);
+        $this->assertSame('omah', $config['username']);
+        $this->assertSame('rahasia-123', $config['password']);
+        $this->assertTrue($config['tls']);
+    }
+
+    public function test_mqtt_password_is_encrypted_and_never_shown_or_logged(): void
+    {
+        $this->actingAs($this->user)->post(route('settings.mqttUpdate'), $this->mqttPayload());
+
+        $this->assertNotSame('rahasia-123', Setting::find('mqtt_password')->value);
+        $this->assertSame('(diubah)', ActivityLog::where('action', 'setting.updated')->latest('id')->first()->properties['after']['mqtt_password']);
+
+        $this->actingAs($this->user)->get(route('settings.system'))->assertDontSee('rahasia-123');
+        $this->actingAs($this->user)->get(route('settings.auditLog'))->assertDontSee('rahasia-123');
+    }
+
+    public function test_blank_mqtt_password_keeps_the_stored_one(): void
+    {
+        $this->actingAs($this->user)->post(route('settings.mqttUpdate'), $this->mqttPayload());
+        $this->actingAs($this->user)->post(route('settings.mqttUpdate'), $this->mqttPayload(['mqtt_password' => '', 'mqtt_host' => '10.0.0.9']));
+
+        $this->assertSame('rahasia-123', MqttSettings::current()['password']);
+        $this->assertSame('10.0.0.9', MqttSettings::current()['host']);
+    }
+
+    public function test_mqtt_settings_change_is_detected_for_subscriber_restart(): void
+    {
+        $before = MqttSettings::fingerprint();
+
+        $this->actingAs($this->user)->post(route('settings.mqttUpdate'), $this->mqttPayload(['mqtt_port' => 1884]));
+
+        $this->assertNotSame($before, MqttSettings::fingerprint());
+    }
+
+    public function test_invalid_mqtt_port_is_rejected(): void
+    {
+        $this->actingAs($this->user)
+            ->post(route('settings.mqttUpdate'), $this->mqttPayload(['mqtt_port' => 70000]))
+            ->assertSessionHasErrors('mqtt_port');
+
+        $this->assertNull(Setting::find('mqtt_port'));
     }
 
     public function test_system_settings_are_saved_and_changes_are_logged(): void

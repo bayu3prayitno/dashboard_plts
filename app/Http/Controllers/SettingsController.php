@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\MqttSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,7 +40,65 @@ class SettingsController extends Controller
 
     public function systemSettings(): View
     {
-        return view('dashboard.settings.system', ['settings' => $this->currentSystemSettings()]);
+        return view('dashboard.settings.system', [
+            'settings' => $this->currentSystemSettings(),
+            'mqtt' => MqttSettings::forForm(),
+            'mqttHasPassword' => Setting::query()->where('key', 'mqtt_password')->where('value', '!=', '')->exists(),
+        ]);
+    }
+
+    /** Simpan konfigurasi broker MQTT. Password kosong berarti tetap memakai yang tersimpan. */
+    public function updateMqttSettings(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'mqtt_host' => ['required', 'string', 'max:255'],
+            'mqtt_port' => ['required', 'integer', 'between:1,65535'],
+            'mqtt_username' => ['nullable', 'string', 'max:255'],
+            'mqtt_password' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $before = MqttSettings::forForm();
+        $userId = $request->user()?->id;
+
+        $values = [
+            'mqtt_host' => trim($data['mqtt_host']),
+            'mqtt_port' => (string) $data['mqtt_port'],
+            'mqtt_username' => trim((string) ($data['mqtt_username'] ?? '')),
+            'mqtt_tls' => $request->boolean('mqtt_tls') ? '1' : '0',
+        ];
+
+        foreach ($values as $key => $value) {
+            if ($before[$key] !== $value) {
+                $this->storeMqttValue($key, $value, $before[$key], $value, $userId);
+            }
+        }
+
+        // Password: diisi = ganti, kosong = biarkan, centang hapus = kosongkan.
+        $newPassword = (string) ($data['mqtt_password'] ?? '');
+        if ($request->boolean('mqtt_clear_password')) {
+            $this->storeMqttValue('mqtt_password', '', null, null, $userId, '');
+        } elseif ($newPassword !== '') {
+            $this->storeMqttValue('mqtt_password', MqttSettings::encryptPassword($newPassword), null, null, $userId, '(diubah)');
+        }
+
+        return redirect()->route('settings.system')->with('success', 'Konfigurasi MQTT disimpan. Subscriber akan dimulai ulang otomatis.');
+    }
+
+    /** Simpan satu nilai MQTT dan catat di audit log. Password tidak pernah dicatat nilainya. */
+    private function storeMqttValue(string $key, string $stored, ?string $before, ?string $after, ?int $userId, ?string $maskedValue = null): void
+    {
+        $setting = Setting::updateOrCreate(
+            ['key' => $key],
+            ['value' => $stored, 'description' => MqttSettings::KEYS[$key]['description']],
+        );
+
+        if ($maskedValue !== null) {
+            ActivityLog::record($userId, 'setting.updated', $setting, [$key => '***'], [$key => $maskedValue]);
+
+            return;
+        }
+
+        ActivityLog::record($userId, 'setting.updated', $setting, [$key => $before], [$key => $after]);
     }
 
     /** Simpan pengaturan sistem. Perubahan setiap nilai dicatat di audit log. */

@@ -86,6 +86,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/users', [SettingsController::class, 'users'])->name('users');
         Route::get('/system', [SettingsController::class, 'systemSettings'])->name('system');
         Route::post('/system', [SettingsController::class, 'updateSystemSettings'])->name('systemUpdate');
+        Route::post('/system/mqtt', [SettingsController::class, 'updateMqttSettings'])->name('mqttUpdate');
         Route::get('/audit-log', [SettingsController::class, 'auditLog'])->name('auditLog');
         Route::get('/scope', [SettingsController::class, 'scopeAssignment'])->name('scope');
         Route::post('/scope/{id}', [SettingsController::class, 'updateScope'])->name('scopeUpdate');

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Gateway;
 use App\Services\GatewayStatusUpdater;
+use App\Services\MqttSettings;
 use App\Services\TelemetryIngestor;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -30,11 +31,14 @@ class MqttSubscribe extends Command
 
     public function handle(TelemetryIngestor $ingestor, GatewayStatusUpdater $statusUpdater): int
     {
-        $config = config('mqtt');
         $codeVersion = $this->codeVersion();
 
         while (true) {
             try {
+                // Dibaca ulang setiap (re)connect dari menu Pengaturan Sistem
+                $config = MqttSettings::current();
+                $settingsVersion = MqttSettings::fingerprint();
+
                 $settings = (new ConnectionSettings)
                     ->setUsername($config['username'])
                     ->setPassword($config['password'])
@@ -66,10 +70,19 @@ class MqttSubscribe extends Command
                         $lastHeartbeat = microtime(true);
                     }
 
-                    // Kode PHP hanya dimuat sekali saat proses mulai. Jika kode berubah, keluar agar
-                    // wrapper (scripts/mqtt-subscribe.bat) menjalankan ulang dengan kode terbaru.
+                    // Kode PHP hanya dimuat sekali saat proses mulai. Jika kode atau setting MQTT berubah,
+                    // keluar agar wrapper (scripts/mqtt-subscribe.bat) menjalankan ulang dengan nilai terbaru.
                     if (microtime(true) - $lastCodeCheck >= self::CODE_CHECK_INTERVAL) {
                         $lastCodeCheck = microtime(true);
+                        if (MqttSettings::fingerprint() !== $settingsVersion) {
+                            Log::info('MQTT: setting broker berubah, subscriber dimulai ulang');
+                            $this->info('Setting MQTT berubah, memulai ulang subscriber...');
+                            Cache::forget(Gateway::MQTT_HEARTBEAT_KEY);
+                            $client->disconnect();
+
+                            return self::SUCCESS;
+                        }
+
                         if ($this->codeVersion() !== $codeVersion) {
                             Log::info('MQTT: kode berubah, subscriber dimulai ulang');
                             $this->info('Kode berubah, memulai ulang subscriber...');
