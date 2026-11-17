@@ -29,8 +29,8 @@ class MqttSubscribe extends Command
     /** Seberapa sering (detik) setting MQTT diperiksa. Perubahan diterapkan tanpa restart proses. */
     private const SETTINGS_CHECK_INTERVAL = 5;
 
-    /** Seberapa sering (detik) kode diperiksa apakah sudah berubah. */
-    private const CODE_CHECK_INTERVAL = 30;
+    /** Seberapa sering (detik) kode MQTT diperiksa apakah sudah berubah. */
+    private const CODE_CHECK_INTERVAL = 300;
 
     public function handle(TelemetryIngestor $ingestor, GatewayStatusUpdater $statusUpdater): int
     {
@@ -137,16 +137,20 @@ class MqttSubscribe extends Command
         }
     }
 
-    /** Sidik jari kode aplikasi: jumlah dan waktu ubah terbaru file di app, config, dan routes. */
+    /** Sidik jari kode MQTT saja: hanya file di app/Console/Commands dan app/Services (bukan seluruh app). */
     private function codeVersion(): string
     {
         $count = 0;
         $latest = 0;
-        foreach (['app', 'config', 'routes'] as $dir) {
-            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(base_path($dir), \FilesystemIterator::SKIP_DOTS));
-            foreach ($iterator as $file) {
+        foreach ([
+            base_path('app/Console/Commands/MqttSubscribe.php'),
+            base_path('app/Services/MqttSettings.php'),
+            base_path('app/Services/TelemetryIngestor.php'),
+            base_path('app/Services/GatewayStatusUpdater.php'),
+        ] as $file) {
+            if (file_exists($file)) {
                 $count++;
-                $latest = max($latest, $file->getMTime());
+                $latest = max($latest, filemtime($file));
             }
         }
 
