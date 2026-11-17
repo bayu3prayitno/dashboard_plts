@@ -51,13 +51,6 @@ class DashboardController extends Controller
         $now = CarbonImmutable::now(self::tz());
         $offlineMinutes = Device::offlineTimeoutMinutes();
 
-        return Cache::remember('dashboard_page_' . $now->format('Y-m-d-H-i'), 60,
-            fn () => $this->buildDashboardView($now, $offlineMinutes)
-        );
-    }
-
-    private function buildDashboardView(CarbonImmutable $now, int $offlineMinutes): View
-    {
         $latest = $this->latestMeasurements();
         $devices = Device::query()
             ->orderBy('node_id')
