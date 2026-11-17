@@ -15,16 +15,19 @@
 <div class="grid min-h-screen p-3 lg:grid-cols-2 lg:p-4">
 
     {{-- Panel hero (desktop) --}}
-    <div class="hero-surface relative hidden flex-col justify-between overflow-hidden rounded-3xl p-10 lg:flex">
-        <div class="flex items-center gap-2.5">
+    <div data-hero class="hero-surface relative hidden flex-col justify-between overflow-hidden rounded-3xl p-10 lg:flex">
+        {{-- Langit: matahari/bulan mengikuti jam (sama dengan dashboard) --}}
+        <x-hero-sky :peak-clear="24" />
+
+        <div class="relative flex items-center gap-2.5">
             <span class="grid size-10 place-items-center rounded-2xl bg-primary text-lime"><x-logo :size="25" /></span>
-            <span class="text-lg font-semibold">OmahIoT</span>
+            <span data-hero-title class="text-lg font-semibold transition-colors duration-1000">OmahIoT</span>
         </div>
-        <img src="{{ asset('images/plts-3D.png') }}" alt=""
-            class="pointer-events-none mx-auto max-h-[52vh] object-contain drop-shadow-xl select-none">
-        <div>
-            <p class="max-w-md text-4xl leading-tight font-medium tracking-tight uppercase">Monitoring PLTS Cerdas</p>
-            <p class="mt-3 max-w-md text-sm text-muted">
+        <img data-hero-img src="{{ asset('images/plts-3D.png') }}" alt=""
+            class="pointer-events-none relative mx-auto max-h-[52vh] object-contain drop-shadow-xl select-none">
+        <div class="relative">
+            <p data-hero-title class="max-w-md text-4xl leading-tight font-medium tracking-tight uppercase transition-colors duration-1000">Monitoring PLTS Cerdas</p>
+            <p data-hero-subtitle class="mt-3 max-w-md text-sm text-muted transition-colors duration-1000">
                 Suhu, tegangan, arus, daya, dan irradiance tiap 5 menit, lengkap dengan histori, peringatan, dan kualitas link LoRa.
             </p>
         </div>

@@ -43,6 +43,88 @@ a {
         linear-gradient(120deg, #e6eadf 0%, #d6ddcc 55%, #c2ccb6 100%);
 }
 
+/* ===== Langit hero: matahari/bulan mengikuti jam (diatur JS di dashboard) ===== */
+.hero-sky {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+.hero-sky__tint {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+}
+/* Siang: cahaya matahari hangat yang mengikuti posisi matahari + rona sage-lime di atas.
+   Tetap dalam palet brand, tapi cukup beda dari latar web (#eceeea). */
+.hero-sky__tint--day {
+    background:
+        radial-gradient(38% 55% at var(--sun-x, 50%) var(--sun-y, 30%), rgb(255 236 170 / 0.75), rgb(255 244 205 / 0.35) 45%, transparent 75%),
+        linear-gradient(to bottom, rgb(208 224 178 / 0.85) 0%, rgb(222 232 200 / 0.5) 45%, transparent 85%);
+}
+.hero-sky__tint--warm {
+    background: radial-gradient(80% 70% at var(--glow-x, 10%) 85%, rgb(255 170 90 / 0.55), transparent 70%);
+}
+.hero-sky__tint--night {
+    background: linear-gradient(to bottom, rgb(16 26 56 / 0.82), rgb(28 40 74 / 0.55) 60%, rgb(40 52 80 / 0.35));
+}
+.hero-sky__body {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    opacity: 0;
+    transition: left 1s linear, top 1s linear, opacity 1.2s ease, filter 1.5s ease;
+}
+.hero-sun {
+    width: 3.75rem;
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    background: radial-gradient(circle at 40% 38%, #fffbe3 0%, #ffe07a 40%, #ffb93d 75%);
+    box-shadow: 0 0 40px 16px rgb(255 205 90 / 0.45), 0 0 120px 50px rgb(255 190 70 / 0.22);
+}
+.hero-moon {
+    width: 2.75rem;
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    background:
+        radial-gradient(circle at 62% 30%, rgb(190 194 180 / 0.55) 0 9%, transparent 10%),
+        radial-gradient(circle at 35% 62%, rgb(190 194 180 / 0.45) 0 12%, transparent 13%),
+        radial-gradient(circle at 66% 70%, rgb(190 194 180 / 0.4) 0 6%, transparent 7%),
+        radial-gradient(circle at 38% 35%, #ffffff, #e4e7da 70%);
+    box-shadow: 0 0 30px 10px rgb(220 230 255 / 0.35), 0 0 90px 30px rgb(200 215 255 / 0.15);
+}
+.hero-star {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    border-radius: 9999px;
+    background: #fff;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+}
+.hero-sky[data-phase='night'] .hero-star {
+    animation: hero-twinkle 3s ease-in-out infinite;
+}
+.hero-sky.is-paused .hero-star { animation-play-state: paused; }
+@keyframes hero-twinkle {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 1; }
+}
+.hero-sky.no-anim .hero-sky__body,
+.hero-sky.no-anim .hero-sky__tint,
+.hero-sky.no-anim .hero-star { transition: none; }
+/* Teks hero (dan breadcrumb header yang menumpang di atasnya) tetap terbaca di langit malam */
+.hero-surface[data-phase='day'] [data-hero-subtitle] { color: #4a524a; } /* kontras ≥ 4.5:1 di atas rona siang */
+.hero-surface[data-phase='night'] [data-hero-title] { color: #fff; }
+.hero-surface[data-phase='night'] [data-hero-subtitle] { color: rgb(255 255 255 / 0.75); }
+[data-hero-phase='night'] [data-app-header]:not(.is-stuck) > p { color: rgb(255 255 255 / 0.8); }
+@media (prefers-reduced-motion: reduce) {
+    .hero-sky__body, .hero-sky__tint, .hero-star { transition: none; }
+    .hero-sky[data-phase='night'] .hero-star { animation: none; opacity: 0.7; }
+}
+
 .glass {
     background: rgb(255 255 255 / 0.5);
     border: 1px solid rgb(255 255 255 / 0.7);

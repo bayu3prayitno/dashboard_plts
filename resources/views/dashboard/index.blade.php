@@ -34,15 +34,20 @@
 @section('content')
     {{-- ================= HERO ================= --}}
     {{-- Margin negatif membuat header (cari + notifikasi) menumpang di atas banner --}}
-    <section class="hero-surface relative -mt-16 mb-4 overflow-hidden rounded-3xl px-5 pt-20 pb-5 sm:px-7 md:min-h-[25rem]">
-        <img src="{{ asset('images/plts-3D.png') }}" alt=""
-            class="pointer-events-none mx-auto -mb-2 h-52 object-contain drop-shadow-xl select-none md:absolute md:top-1/2 md:left-[36%] md:mb-0 md:h-[112%] md:-translate-y-[46%] xl:left-[40%]">
+    {{-- Ponsel (< md): full-bleed, menembus padding layout (p-3) ke tepi kiri/kanan/atas layar --}}
+    <section data-hero class="hero-surface relative -mt-16 mb-4 overflow-hidden rounded-3xl px-5 pt-20 pb-5 sm:px-7 md:min-h-[25rem]
+                              max-md:-mx-3 max-md:-mt-[4.75rem] max-md:rounded-t-none max-md:pt-24 max-md:pb-6">
+        {{-- Langit: matahari/bulan mengikuti jam (komponen dipakai juga di halaman login) --}}
+        <x-hero-sky :peak-clear="38" />
+
+        <img data-hero-img src="{{ asset('images/plts-3D.png') }}" alt=""
+            class="pointer-events-none relative mx-auto -mb-2 h-64 object-contain sm:h-72 drop-shadow-xl select-none md:absolute md:top-1/2 md:left-[36%] md:mb-0 md:h-[112%] md:-translate-y-[46%] xl:left-[40%]">
 
         <div class="relative flex h-full flex-col gap-6 md:min-h-[19rem] md:justify-between">
-            <div class="max-w-sm">
-                <h1 class="text-3xl leading-tight font-medium tracking-tight uppercase sm:text-4xl">Monitoring<br>PLTS Cerdas</h1>
-                <p class="mt-2 text-sm text-muted">Pantau node sensor dan gateway LoRa secara real-time.</p>
-                <div class="mt-4 flex flex-wrap gap-2">
+            <div class="max-w-sm max-md:mx-auto max-md:text-center">
+                <h1 data-hero-title class="text-3xl leading-tight font-medium tracking-tight uppercase transition-colors duration-1000 sm:text-4xl">Monitoring<br>PLTS Cerdas</h1>
+                <p data-hero-subtitle class="mt-2 text-sm text-muted transition-colors duration-1000">Pantau node sensor dan gateway LoRa secara real-time.</p>
+                <div class="mt-4 flex flex-wrap gap-2 max-md:justify-center">
                     <a href="{{ route('devices.create') }}" class="btn btn-primary hidden"><x-icon name="plus" :size="16" /> Tambah Perangkat</a>
                     <a href="{{ route('historical.exportCsv') }}" class="btn btn-outline bg-white/60 hidden"><x-icon name="download" :size="16" /> Ekspor CSV</a>
                 </div>
