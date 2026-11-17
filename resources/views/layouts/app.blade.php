@@ -31,6 +31,7 @@
     $initials = collect(explode(' ', $layoutUser['nama']))->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->join('');
 @endphp
 <body class="font-sans antialiased">
+<x-page-progress />
 <div class="mx-auto flex min-h-screen max-w-[1600px] gap-4 p-3 lg:p-4">
 
     {{-- Overlay laci ponsel --}}

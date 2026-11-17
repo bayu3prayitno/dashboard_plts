@@ -12,6 +12,7 @@
     ] : [];
 @endphp
 <body class="font-sans antialiased">
+<x-page-progress />
 <div class="grid min-h-screen p-3 lg:grid-cols-2 lg:p-4">
 
     {{-- Panel hero (desktop) --}}
