@@ -29,7 +29,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Data untuk header & sidebar
         View::composer('layouts.app', function ($view) {
-            $openAlerts = Alert::query()->open()->with('device:id,name')->latest('triggered_at')->get();
+            // Hitung di database (1 query), bukan memuat semua alert terbuka ke memori
+            $counts = Alert::query()->open()
+                ->selectRaw('COUNT(*) AS open_count, COALESCE(SUM(status = ?), 0) AS fresh_count', [Alert::STATUS_NEW])
+                ->first();
 
             $view->with([
                 // Halaman ber-layout ini selalu di balik middleware auth
@@ -39,9 +42,15 @@ class AppServiceProvider extends ServiceProvider
                     'super' => (bool) auth()->user()?->isSuperAdmin(),
                 ],
                 'layoutTimezone' => DashboardController::tz(),
-                'layoutActiveAlerts' => $openAlerts->count(),
-                'layoutFreshAlerts' => $openAlerts
+                'layoutActiveAlerts' => (int) $counts->open_count,
+                'layoutFreshCount' => (int) $counts->fresh_count,
+                // Panel notifikasi hanya menampilkan 5 teratas
+                'layoutFreshAlerts' => $counts->fresh_count == 0 ? [] : Alert::query()
                     ->where('status', Alert::STATUS_NEW)
+                    ->with('device:id,name')
+                    ->latest('triggered_at')
+                    ->limit(5)
+                    ->get()
                     ->map(fn (Alert $a) => [
                         'category' => $a->typeLabel(),
                         'device' => $a->device?->name ?? '-',

@@ -132,44 +132,29 @@ class AlertController extends Controller
     }
 
     /** SSE: stream alert baru real-time ke client. */
-    public function liveStream(): \Symfony\Component\HttpFoundation\StreamedResponse
+    /**
+     * Polling ringan untuk toast peringatan baru (menggantikan SSE yang menahan worker server).
+     * Tanpa ?after → hanya mengembalikan id terakhir sebagai titik awal (tanpa toast).
+     */
+    public function liveStream(Request $request): \Illuminate\Http\JsonResponse
     {
-        $response = new \Symfony\Component\HttpFoundation\StreamedResponse(function () {
-            $lastId = request()->header('Last-Event-ID', 0);
-            $newAlerts = Alert::query()
-                ->where('id', '>', $lastId)
-                ->with('device:id,name')
-                ->latest('id')
-                ->limit(10)
-                ->get()
-                ->reverse();
+        if (! $request->filled('after')) {
+            return response()->json(['last_id' => (int) Alert::query()->max('id'), 'alerts' => []]);
+        }
 
-            foreach ($newAlerts as $alert) {
-                echo 'id: '.$alert->id."\n";
-                echo 'data: '.json_encode([
-                    'id' => $alert->id,
-                    'device' => $alert->device?->name ?? '-',
-                    'type' => $alert->alert_type,
-                    'message' => $alert->message(),
-                    'triggered_at' => $alert->triggered_at->toIso8601String(),
-                ])."\n\n";
-                flush();
-            }
+        $alerts = Alert::query()
+            ->where('id', '>', (int) $request->query('after'))
+            ->with('device:id,name')
+            ->orderBy('id')
+            ->limit(10)
+            ->get();
 
-            // Keep connection alive: kirim keep-alive comment setiap 20 detik
-            $start = time();
-            while (time() - $start < 55) {
-                echo ": keepalive\n\n";
-                sleep(20);
-                flush();
-            }
-        });
-
-        $response->headers->set('Content-Type', 'text/event-stream');
-        $response->headers->set('Cache-Control', 'no-cache');
-        $response->headers->set('Connection', 'keep-alive');
-        $response->headers->set('X-Accel-Buffering', 'no');
-
-        return $response;
+        return response()->json([
+            'last_id' => (int) ($alerts->last()?->id ?? $request->query('after')),
+            'alerts' => $alerts->map(fn (Alert $a) => [
+                'device' => $a->device?->name ?? '-',
+                'message' => $a->message(),
+            ])->values(),
+        ]);
     }
 }

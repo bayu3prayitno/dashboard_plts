@@ -128,16 +128,16 @@
 
                 {{-- Notifikasi --}}
                 <div class="relative" data-notifications>
-                    <button type="button" data-toggle aria-label="Notifikasi, {{ count($layoutFreshAlerts) }} peringatan baru"
+                    <button type="button" data-toggle aria-label="Notifikasi, {{ $layoutFreshCount }} peringatan baru"
                         class="relative grid size-10 place-items-center rounded-full bg-white shadow-sm hover:bg-primary-soft">
                         <x-icon name="bell" :size="18" />
-                        @if (count($layoutFreshAlerts) > 0)
-                            <span class="absolute -top-0.5 -right-0.5 grid size-4.5 place-items-center rounded-full bg-red-600 text-[10px] font-semibold text-white">{{ count($layoutFreshAlerts) }}</span>
+                        @if ($layoutFreshCount > 0)
+                            <span class="absolute -top-0.5 -right-0.5 grid size-4.5 place-items-center rounded-full bg-red-600 text-[10px] font-semibold text-white">{{ $layoutFreshCount }}</span>
                         @endif
                     </button>
                     <div data-panel class="absolute right-0 z-30 mt-2 hidden w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-line border-gray-200 bg-white p-2 shadow-lg">
                         <p class="px-3 py-2 text-sm font-semibold">Peringatan baru</p>
-                        @forelse (array_slice($layoutFreshAlerts, 0, 5) as $a)
+                        @forelse ($layoutFreshAlerts as $a)
                             <a href="{{ route('alerts.index') }}" class="block px-3 py-2 hover:bg-canvas border-t border-gray-200 first:border-t-0 ">
                                 <p class="block text-sm font-medium">{{ $a['category'] }}.  <span class="text-[10px] text-muted font-italic">{{ \App\Support\Format::relTime($a['waktu']) }}</span></p>
                                 <p class="block text-xs text-muted"><span class="font-bold">{{ $a['device'] }}: </span> {{ $a['text'] }}.</p>
@@ -252,55 +252,30 @@
     setInterval(updateClock, 1000);
 })();
 
-// Real-time Updates: polling untuk data dan SSE untuk alerts
+// Toast peringatan baru: polling ringan tiap 30 detik, hanya saat tab terlihat.
+// id terakhir disimpan per tab agar pindah halaman tidak memicu request tambahan/toast ganda.
 (function () {
-    // Polling dashboard data setiap 3 detik
-    const pollDashboard = () => {
-        fetch('/api/live/dashboard')
-            .then(r => r.json())
-            .then(data => {
-                // Update alert count di header
-                const badge = document.querySelector('[data-notifications] .nav-badge');
-                if (badge && data.alerts) {
-                    const count = data.alerts.filter(a => a.status === 'baru').length;
-                    if (count > 0) {
-                        badge.textContent = count;
-                        badge.classList.remove('hidden');
-                    } else {
-                        badge.classList.add('hidden');
-                    }
-                }
-            })
-            .catch(e => console.debug('Poll error:', e));
+    const KEY = 'alertLastId';
+    const INTERVAL = 30000;
+    let lastId = null;
+    try { lastId = sessionStorage.getItem(KEY); } catch (e) {}
+
+    const poll = async () => {
+        if (document.hidden) return;
+        try {
+            const res = await fetch('{{ route('api.live.alerts') }}' + (lastId ? '?after=' + lastId : ''),
+                { headers: { Accept: 'application/json' } });
+            if (!res.ok) return;
+            const data = await res.json();
+            data.alerts.forEach((a) => showToast(`🚨 ${a.device}: ${a.message}`, 'error'));
+            lastId = data.last_id;
+            try { sessionStorage.setItem(KEY, lastId); } catch (e) {}
+        } catch (e) {}
     };
 
-    // SSE untuk alerts real-time
-    const connectAlerts = () => {
-        const eventSource = new EventSource('/api/live/alerts');
-        eventSource.onmessage = (e) => {
-            if (e.data === ': keepalive') return;
-            try {
-                const alert = JSON.parse(e.data);
-                showToast(`🚨 ${alert.device}: ${alert.message}`, 'error');
-            } catch (err) {}
-        };
-        eventSource.onerror = () => {
-            eventSource.close();
-            setTimeout(connectAlerts, 5000);
-        };
-    };
-
-    if (document.readyState !== 'loading') {
-        pollDashboard();
-        connectAlerts();
-    } else {
-        document.addEventListener('DOMContentLoaded', () => {
-            pollDashboard();
-            connectAlerts();
-        });
-    }
-
-    setInterval(pollDashboard, 3000);
+    // Kunjungan pertama tab: ambil titik awal. Setelahnya cukup tunggu interval.
+    if (!lastId) setTimeout(poll, 3000);
+    setInterval(poll, INTERVAL);
 })();
 </script>
 {{-- Notifikasi toast (global): pesan flash dari server atau showToast() dari JavaScript --}}

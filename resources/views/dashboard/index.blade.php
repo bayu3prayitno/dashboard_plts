@@ -463,44 +463,5 @@
     tabs.forEach((t) => t.addEventListener('click', () => { range = t.dataset.trendRange; draw(); }));
     new ResizeObserver(() => draw()).observe(box);
 })();
-
-// Real-time alerts polling saja (notifikasi otomatis)
-(function () {
-    const pollAlerts = async () => {
-        try {
-            const res = await fetch('/api/live/alerts');
-            const data = await res.json();
-
-            // Update alert count tile
-            const alertTiles = document.querySelectorAll('[data-tile="alerts"]');
-            alertTiles.forEach(tile => {
-                const countEl = tile.querySelector('[data-count]');
-                if (countEl) countEl.textContent = data.count ?? 0;
-            });
-
-            // Update alerts section jika ada
-            const alertsSection = document.querySelector('[data-alerts-section]');
-            if (alertsSection && data.alerts?.length) {
-                const alertsList = alertsSection.querySelector('ul');
-                if (alertsList) {
-                    alertsList.innerHTML = data.alerts.slice(0, 3).map(a => `
-                        <li class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-canvas p-3">
-                            <div class="min-w-0 flex-1 basis-48">
-                                <p class="flex flex-wrap items-center gap-2 text-sm font-semibold">${a.device}</p>
-                                <p class="mt-1 text-xs text-muted">${a.text}</p>
-                            </div>
-                        </li>
-                    `).join('');
-                }
-            }
-        } catch (e) {
-            console.debug('Alerts poll error:', e);
-        }
-    };
-
-    // Poll alerts setiap 15 detik saja (notifikasi)
-    pollAlerts();
-    setInterval(pollAlerts, 15000);
-})();
 </script>
 @endpush
