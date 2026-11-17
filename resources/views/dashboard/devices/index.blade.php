@@ -86,7 +86,7 @@
     <!-- Pagination -->
     <div class="flex justify-between items-center text-sm text-muted">
         <span>Menampilkan {{ $devices->count() }} dari {{ $devices->total() }} perangkat</span>
-        {{ $devices->links() }}
+        <x-pagination :paginator="$devices" />
     </div>
 </div>
 

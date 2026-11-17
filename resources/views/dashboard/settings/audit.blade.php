@@ -50,7 +50,7 @@
         </table>
     </div>
 
-    <div>{{ $logs->links() }}</div>
+    <div class="flex justify-end"><x-pagination :paginator="$logs" /></div>
 
     <!-- Summary Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">

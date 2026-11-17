@@ -84,7 +84,7 @@
     <!-- Pagination -->
     <div class="flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-muted">
         <span>Menampilkan {{ $alerts->firstItem() ?? 0 }}–{{ $alerts->lastItem() ?? 0 }} dari {{ $alerts->total() }} alert</span>
-        {{ $alerts->onEachSide(1)->links() }}
+        <x-pagination :paginator="$alerts" />
     </div>
 
     <!-- Summary -->
