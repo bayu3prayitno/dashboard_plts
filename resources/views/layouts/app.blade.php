@@ -129,12 +129,12 @@
                             <span class="absolute -top-0.5 -right-0.5 grid size-4.5 place-items-center rounded-full bg-red-600 text-[10px] font-semibold text-white">{{ count($layoutFreshAlerts) }}</span>
                         @endif
                     </button>
-                    <div data-panel class="absolute right-0 z-30 mt-2 hidden w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-line bg-white p-2 shadow-lg">
+                    <div data-panel class="absolute right-0 z-30 mt-2 hidden w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-line border-gray-200 bg-white p-2 shadow-lg">
                         <p class="px-3 py-2 text-sm font-semibold">Peringatan baru</p>
                         @forelse (array_slice($layoutFreshAlerts, 0, 5) as $a)
-                            <a href="{{ route('alerts.index') }}" class="block rounded-xl px-3 py-2 hover:bg-canvas">
-                                <span class="block text-sm font-medium">{{ $a['device'] }}</span>
-                                <span class="block text-xs text-muted">{{ $a['text'] }} · {{ \App\Support\Format::relTime($a['waktu']) }}</span>
+                            <a href="{{ route('alerts.index') }}" class="block px-3 py-2 hover:bg-canvas border-t border-gray-200 first:border-t-0 ">
+                                <p class="block text-sm font-medium">{{ $a['category'] }}.  <span class="text-[10px] text-muted font-italic">{{ \App\Support\Format::relTime($a['waktu']) }}</span></p>
+                                <p class="block text-xs text-muted"><span class="font-bold">{{ $a['device'] }}: </span> {{ $a['text'] }}.</p>
                             </a>
                         @empty
                             <p class="px-3 pb-3 text-sm text-muted">Tidak ada peringatan baru.</p>

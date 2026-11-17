@@ -37,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
                 'layoutFreshAlerts' => $openAlerts
                     ->where('status', Alert::STATUS_NEW)
                     ->map(fn (Alert $a) => [
+                        'category' => $a->typeLabel(),
                         'device' => $a->device?->name ?? '-',
                         'text' => $a->message(),
                         'waktu' => $a->triggered_at,
