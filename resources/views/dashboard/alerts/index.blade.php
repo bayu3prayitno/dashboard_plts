@@ -7,7 +7,7 @@
 @section('content')
 <div class="space-y-6">
     <!-- Filter Bar -->
-    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-white p-4 rounded-lg shadow">
         <form method="GET" action="{{ route('alerts.index') }}" class="flex flex-wrap gap-3">
             <select name="status" onchange="this.form.submit()" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Semua Status</option>
@@ -37,8 +37,8 @@
                     <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Tipe Alert</th>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Perangkat</th>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Pesan</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status Penanganan</th>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Waktu Kejadian</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status Penanganan</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
@@ -60,17 +60,17 @@
                         <span class="block text-xs font-normal text-gray-500">Node {{ $alert->device?->node_id }}</span>
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-600">{{ $alert->message() }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ $alert->triggered_at->timezone(\App\Http\Controllers\DashboardController::tz())->format('d M Y H:i') }}</td>
                     <td class="px-6 py-4 text-sm">
-                        <select onchange="updateAlertStatus('{{ route('alerts.updateStatus', $alert) }}', this.value)" class="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select onchange="updateAlertStatus('{{ route('alerts.updateStatus', $alert) }}', this.value)" class="px-3 py-1 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="new" @selected($alert->status === 'new')>Baru</option>
                             <option value="acknowledged" @selected($alert->status === 'acknowledged')>Ditangani</option>
                             <option value="resolved" @selected($alert->status === 'resolved')>Selesai</option>
                         </select>
                         @if($alert->resolution_note)
-                            <span class="block text-xs text-gray-500 mt-1">{{ $alert->resolution_note }}</span>
+                            <span class="block text-xs text-gray-500 mt-1 hidden">{{ $alert->resolution_note }}</span>
                         @endif
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ $alert->triggered_at->timezone(\App\Http\Controllers\DashboardController::tz())->format('d M Y H:i') }}</td>
                 </tr>
                 @empty
                 <tr>
@@ -81,10 +81,14 @@
         </table>
     </div>
 
-    <div>{{ $alerts->links() }}</div>
+    <!-- Pagination -->
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-gray-600">
+        <span>Menampilkan {{ $alerts->firstItem() ?? 0 }}–{{ $alerts->lastItem() ?? 0 }} dari {{ $alerts->total() }} alert</span>
+        {{ $alerts->onEachSide(1)->links() }}
+    </div>
 
     <!-- Summary -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
         <div class="bg-red-50 rounded-lg p-4">
             <p class="text-gray-600 text-sm">Alert Baru</p>
             <p class="text-2xl font-bold text-red-600">{{ $counts['new'] }}</p>
