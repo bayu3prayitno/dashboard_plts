@@ -6,11 +6,22 @@
 @section('page-title', 'Manajemen Gateway')
 @section('page-subtitle', 'Monitor kesehatan dan status infrastruktur Gateway')
 
+@php
+    // Modal: animasi masuk/keluar CSS murni (Tailwind v4: starting: + transition-discrete), sama dengan halaman profil
+    $dialog = 'm-auto w-[calc(100%-2rem)] max-w-md rounded-3xl bg-white p-6 text-ink shadow-2xl
+               opacity-0 scale-95 transition-all transition-discrete duration-200 ease-out motion-reduce:transition-none
+               open:opacity-100 open:scale-100 starting:open:opacity-0 starting:open:scale-95
+               backdrop:bg-black/50 backdrop:opacity-0 backdrop:transition-all backdrop:transition-discrete backdrop:duration-200
+               open:backdrop:opacity-100 starting:open:backdrop:opacity-0';
+    // Buka modal otomatis bila validasi gagal atau datang dari /gateway/create
+    $openCreate = $errors->createGateway->any() || request()->boolean('create');
+@endphp
+
 @section('content')
 <div class="space-y-6">
     <!-- Action Bar -->
     <div class="flex justify-end">
-        <a href="{{ route('gateway.create') }}" class="btn btn-primary">Tambah Gateway</a>
+        <button type="button" data-open-modal="create-gateway" class="btn btn-primary">Tambah Gateway</button>
     </div>
 
     <!-- Summary Cards -->
@@ -71,4 +82,57 @@
         </table>
     </div>
 </div>
+
+{{-- ================= MODAL: TAMBAH GATEWAY ================= --}}
+<dialog id="create-gateway" class="{{ $dialog }}" aria-labelledby="create-gateway-title">
+    <form method="POST" action="{{ route('gateway.store') }}" class="space-y-4">
+        @csrf
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h2 id="create-gateway-title" class="text-lg font-semibold">Tambah Gateway</h2>
+                <p class="mt-0.5 text-sm text-muted">Kode gateway dibuat otomatis (contoh: GW-001) dan tidak bisa diubah setelah disimpan.</p>
+            </div>
+            <button type="button" data-close-modal aria-label="Tutup" class="grid size-9 shrink-0 place-items-center rounded-full text-muted hover:bg-canvas hover:text-ink">
+                <x-icon name="x" :size="18" />
+            </button>
+        </div>
+
+        <label class="block text-sm">
+            <span class="mb-1.5 block font-medium">Nama gateway</span>
+            <input name="name" value="{{ old('name') }}" required maxlength="255" autofocus
+                class="w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 @error('name', 'createGateway') border-red-300 @enderror">
+            @error('name', 'createGateway')<span class="mt-1 block text-xs text-red-600">{{ $message }}</span>@enderror
+        </label>
+
+        <div class="flex justify-end gap-2 pt-2">
+            <button type="button" data-close-modal class="btn btn-outline">Batal</button>
+            <button type="submit" class="btn btn-primary">Simpan</button>
+        </div>
+    </form>
+</dialog>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const dialog = document.getElementById('create-gateway');
+
+    document.querySelectorAll('[data-open-modal="create-gateway"]').forEach((btn) =>
+        btn.addEventListener('click', () => dialog.showModal()));
+    dialog.querySelectorAll('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => dialog.close()));
+    // Klik di backdrop (di luar panel) menutup modal
+    dialog.addEventListener('click', (e) => {
+        const r = dialog.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialog.close();
+    });
+    // Cegah kirim ganda
+    dialog.querySelector('form').addEventListener('submit', (e) => {
+        e.submitter?.setAttribute('disabled', '');
+    });
+
+    @if ($openCreate)
+        dialog.showModal();
+    @endif
+})();
+</script>
+@endpush

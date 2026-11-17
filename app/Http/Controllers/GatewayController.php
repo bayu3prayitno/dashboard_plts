@@ -33,15 +33,17 @@ class GatewayController extends Controller
         ]);
     }
 
-    public function create(): View
+    /** Form tambah kini berupa modal di halaman daftar; URL lama tetap berfungsi dan langsung membuka modal. */
+    public function create(): RedirectResponse
     {
-        return view('dashboard.gateway.create');
+        return redirect()->route('gateway.index', ['create' => 1]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        // Kode gateway dibuat otomatis oleh model Gateway
-        $data = $request->validate([
+        // Kode gateway dibuat otomatis oleh model Gateway.
+        // Error bag terpisah agar modal di halaman daftar tahu kapan harus dibuka ulang.
+        $data = $request->validateWithBag('createGateway', [
             'name' => ['required', 'string', 'max:255'],
         ]);
 
