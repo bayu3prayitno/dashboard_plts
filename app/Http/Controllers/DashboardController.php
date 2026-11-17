@@ -308,4 +308,30 @@ class DashboardController extends Controller
 
         return $values === [] ? null : array_sum($values) / count($values);
     }
+
+    /** API untuk polling: return data dashboard terbaru (devices, status, measurements). */
+    public function liveData(): \Illuminate\Http\JsonResponse
+    {
+        $offlineMinutes = Device::offlineTimeoutMinutes();
+        $latest = $this->latestMeasurements();
+        $devices = Device::query()
+            ->orderBy('node_id')
+            ->get()
+            ->map(fn (Device $device) => $this->deviceRow($device, $latest->get($device->id), $offlineMinutes))
+            ->all();
+
+        $online = array_values(array_filter($devices, fn ($d) => $d['status'] === Device::STATUS_ONLINE));
+        $avg = fn (string $key) => $this->average(array_column(array_column($online, 'latest'), $key));
+
+        return response()->json([
+            'devices' => $devices,
+            'alerts' => $this->activeAlerts(),
+            'onlineCount' => count($online),
+            'offlineCount' => count($devices) - count($online),
+            'powerNow' => $avg('power'),
+            'temperatureNow' => $avg('temperature'),
+            'gateway' => $this->gatewayRow(),
+            'timestamp' => now()->toIso8601String(),
+        ]);
+    }
 }

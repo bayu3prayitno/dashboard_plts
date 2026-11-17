@@ -163,6 +163,30 @@ class DeviceController extends Controller
         return response()->json(['success' => true, 'message' => 'Perangkat berhasil dihapus.']);
     }
 
+    /** API untuk polling: return status device terbaru (online/offline/inactive). */
+    public function liveStatus(): JsonResponse
+    {
+        $offlineMinutes = Device::offlineTimeoutMinutes();
+        $devices = Device::query()
+            ->orderBy('node_id')
+            ->get(['id', 'node_id', 'name', 'is_active', 'last_seen_at'])
+            ->map(function (Device $device) use ($offlineMinutes) {
+                return [
+                    'id' => $device->id,
+                    'node_id' => $device->node_id,
+                    'name' => $device->name,
+                    'status' => $device->status($offlineMinutes),
+                    'last_seen' => $device->last_seen_at?->toIso8601String(),
+                ];
+            })
+            ->all();
+
+        return response()->json([
+            'devices' => $devices,
+            'timestamp' => now()->toIso8601String(),
+        ]);
+    }
+
     /** @return array<string, array<int, string>> */
     private function rules(): array
     {

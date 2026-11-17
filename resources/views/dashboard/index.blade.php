@@ -463,5 +463,58 @@
     tabs.forEach((t) => t.addEventListener('click', () => { range = t.dataset.trendRange; draw(); }));
     new ResizeObserver(() => draw()).observe(box);
 })();
+
+// Real-time polling untuk dashboard data setiap 5 detik
+(function () {
+    const updateDashboard = async () => {
+        try {
+            const res = await fetch('/api/live/dashboard');
+            const data = await res.json();
+
+            // Update tile counts
+            const tiles = {
+                'total': () => document.querySelectorAll('[data-tile="devices"]'),
+                'online': () => document.querySelectorAll('[data-tile="online"]'),
+                'offline': () => document.querySelectorAll('[data-tile="offline"]'),
+                'alerts': () => document.querySelectorAll('[data-tile="alerts"]'),
+            };
+
+            // Update device measurements dalam tabel (jika ada)
+            if (data.devices && document.querySelector('[data-devices-table]')) {
+                data.devices.forEach(d => {
+                    const row = document.querySelector(`[data-device-id="${d.id}"]`);
+                    if (row) {
+                        // Update status badge
+                        const status = row.querySelector('[data-status]');
+                        if (status) {
+                            status.dataset.status = d.status;
+                            status.textContent = d.status === 'online' ? '🟢 Online' : d.status === 'offline' ? '🔴 Offline' : '⚫ Nonaktif';
+                        }
+                        // Update measurements
+                        Object.keys(d.latest || {}).forEach(key => {
+                            const cell = row.querySelector(`[data-sensor="${key}"]`);
+                            if (cell && d.latest[key] !== null) {
+                                cell.textContent = d.latest[key].toFixed(1);
+                            }
+                        });
+                    }
+                });
+            }
+
+            // Update gateway status (jika ada)
+            const gwCard = document.querySelector('[data-gateway-card]');
+            if (gwCard && data.gateway) {
+                gwCard.dataset.status = data.gateway.status;
+                gwCard.querySelector('[data-gw-status]').textContent = data.gateway.status;
+            }
+        } catch (e) {
+            console.debug('Dashboard poll error:', e);
+        }
+    };
+
+    // Start polling
+    updateDashboard();
+    setInterval(updateDashboard, 5000);
+})();
 </script>
 @endpush

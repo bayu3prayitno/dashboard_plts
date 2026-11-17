@@ -80,6 +80,13 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{gateway}', [GatewayApiController::class, 'destroy'])->name('destroy');
     });
 
+    // API untuk live data (polling + SSE)
+    Route::prefix('api/live')->name('api.live.')->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'liveData'])->name('dashboard');
+        Route::get('/alerts', [AlertController::class, 'liveStream'])->name('alerts');
+        Route::get('/devices-status', [DeviceController::class, 'liveStatus'])->name('devices');
+    });
+
     // Settings
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('/', [SettingsController::class, 'index'])->name('index');

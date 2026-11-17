@@ -251,6 +251,57 @@
     updateClock();
     setInterval(updateClock, 1000);
 })();
+
+// Real-time Updates: polling untuk data dan SSE untuk alerts
+(function () {
+    // Polling dashboard data setiap 3 detik
+    const pollDashboard = () => {
+        fetch('/api/live/dashboard')
+            .then(r => r.json())
+            .then(data => {
+                // Update alert count di header
+                const badge = document.querySelector('[data-notifications] .nav-badge');
+                if (badge && data.alerts) {
+                    const count = data.alerts.filter(a => a.status === 'baru').length;
+                    if (count > 0) {
+                        badge.textContent = count;
+                        badge.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                }
+            })
+            .catch(e => console.debug('Poll error:', e));
+    };
+
+    // SSE untuk alerts real-time
+    const connectAlerts = () => {
+        const eventSource = new EventSource('/api/live/alerts');
+        eventSource.onmessage = (e) => {
+            if (e.data === ': keepalive') return;
+            try {
+                const alert = JSON.parse(e.data);
+                showToast(`🚨 ${alert.device}: ${alert.message}`, 'error');
+            } catch (err) {}
+        };
+        eventSource.onerror = () => {
+            eventSource.close();
+            setTimeout(connectAlerts, 5000);
+        };
+    };
+
+    if (document.readyState !== 'loading') {
+        pollDashboard();
+        connectAlerts();
+    } else {
+        document.addEventListener('DOMContentLoaded', () => {
+            pollDashboard();
+            connectAlerts();
+        });
+    }
+
+    setInterval(pollDashboard, 3000);
+})();
 </script>
 {{-- Notifikasi toast (global): pesan flash dari server atau showToast() dari JavaScript --}}
 <div class="pointer-events-none fixed inset-x-0 top-5 z-[60] flex justify-center px-4 sm:inset-x-auto sm:right-6 sm:justify-end" aria-live="polite">
