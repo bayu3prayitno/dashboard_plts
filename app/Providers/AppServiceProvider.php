@@ -6,6 +6,7 @@ use App\Models\Alert;
 use App\Models\Device;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use App\Http\Controllers\DashboardController;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -33,6 +34,7 @@ class AppServiceProvider extends ServiceProvider
                     'role' => auth()->user()?->roleLabel() ?? '',
                     'super' => (bool) auth()->user()?->isSuperAdmin(),
                 ],
+                'layoutTimezone' => DashboardController::tz(),
                 'layoutActiveAlerts' => $openAlerts->count(),
                 'layoutFreshAlerts' => $openAlerts
                     ->where('status', Alert::STATUS_NEW)

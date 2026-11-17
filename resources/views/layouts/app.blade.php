@@ -112,6 +112,12 @@
             </p>
 
             <div class="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3">
+                {{-- Jam Digital --}}
+                <div class="hidden items-center gap-2 rounded-full bg-white/50 px-4 py-2.5 text-sm font-medium tabular-nums text-ink shadow-sm backdrop-blur-sm md:flex">
+                    <x-icon name="clock" :size="16" class="text-muted" />
+                    <span id="live-clock">00:00:00</span>
+                </div>
+
                 {{-- Cari perangkat --}}
                 <div class="relative min-w-0 flex-1 sm:w-72 sm:flex-none" data-device-search>
                     <x-icon name="search" :size="16" class="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-muted" />
@@ -221,6 +227,29 @@
         panel.classList.toggle('hidden');
     });
     document.addEventListener('click', (e) => { if (!notif.contains(e.target)) panel.classList.add('hidden'); });
+})();
+
+// Live Clock (mengikuti timezone dari setting)
+(function () {
+    const clock = document.getElementById('live-clock');
+    if (!clock) return;
+
+    const timezone = '{{ $layoutTimezone ?? "Asia/Jakarta" }}';
+
+    function updateClock() {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+            timeZone: timezone
+        });
+        clock.textContent = formatter.format(now);
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
 })();
 </script>
 {{-- Notifikasi toast (global): pesan flash dari server atau showToast() dari JavaScript --}}
