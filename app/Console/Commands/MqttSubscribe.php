@@ -26,6 +26,9 @@ class MqttSubscribe extends Command
     /** Interval heartbeat (detik) yang dibaca web untuk menentukan status MQTT. */
     private const HEARTBEAT_INTERVAL = 5;
 
+    /** Seberapa sering (detik) setting MQTT diperiksa. Perubahan diterapkan tanpa restart proses. */
+    private const SETTINGS_CHECK_INTERVAL = 5;
+
     /** Seberapa sering (detik) kode diperiksa apakah sudah berubah. */
     private const CODE_CHECK_INTERVAL = 30;
 
@@ -61,6 +64,7 @@ class MqttSubscribe extends Command
 
                 // Loop manual agar heartbeat tetap dikirim selama menunggu pesan
                 $lastHeartbeat = 0.0;
+                $lastSettingsCheck = microtime(true);
                 $lastCodeCheck = microtime(true);
                 while (true) {
                     $client->loopOnce(microtime(true), true);
@@ -70,18 +74,23 @@ class MqttSubscribe extends Command
                         $lastHeartbeat = microtime(true);
                     }
 
-                    // Kode PHP hanya dimuat sekali saat proses mulai. Jika kode atau setting MQTT berubah,
-                    // keluar agar wrapper (scripts/mqtt-subscribe.bat) menjalankan ulang dengan nilai terbaru.
-                    if (microtime(true) - $lastCodeCheck >= self::CODE_CHECK_INTERVAL) {
-                        $lastCodeCheck = microtime(true);
+                    // Setting broker berubah: putus dan sambung ulang di dalam proses ini (tanpa restart).
+                    if (microtime(true) - $lastSettingsCheck >= self::SETTINGS_CHECK_INTERVAL) {
+                        $lastSettingsCheck = microtime(true);
                         if (MqttSettings::fingerprint() !== $settingsVersion) {
-                            Log::info('MQTT: setting broker berubah, subscriber dimulai ulang');
-                            $this->info('Setting MQTT berubah, memulai ulang subscriber...');
+                            Log::info('MQTT: setting broker berubah, menyambung ulang');
+                            $this->info('Setting MQTT berubah, menyambung ulang...');
                             Cache::forget(Gateway::MQTT_HEARTBEAT_KEY);
                             $client->disconnect();
 
-                            return self::SUCCESS;
+                            continue 2; // ulangi loop luar: baca setting baru lalu connect
                         }
+                    }
+
+                    // Kode PHP hanya dimuat sekali saat proses mulai. Jika kode berubah,
+                    // keluar agar wrapper (scripts/mqtt-subscribe.bat) menjalankan ulang dengan kode terbaru.
+                    if (microtime(true) - $lastCodeCheck >= self::CODE_CHECK_INTERVAL) {
+                        $lastCodeCheck = microtime(true);
 
                         if ($this->codeVersion() !== $codeVersion) {
                             Log::info('MQTT: kode berubah, subscriber dimulai ulang');
