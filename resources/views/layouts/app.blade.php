@@ -278,6 +278,27 @@
     setInterval(poll, INTERVAL);
 })();
 </script>
+{{-- Modal konfirmasi (global): pengganti window.confirm(). Pakai: if (await confirmDialog({...})) { ... } --}}
+<dialog id="confirm-dialog" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message"
+    class="m-auto w-[calc(100%-2rem)] max-w-sm rounded-3xl bg-white p-6 text-ink shadow-2xl
+           opacity-0 scale-95 transition-all transition-discrete duration-200 ease-out motion-reduce:transition-none
+           open:opacity-100 open:scale-100 starting:open:opacity-0 starting:open:scale-95
+           backdrop:bg-black/50 backdrop:opacity-0 backdrop:transition-all backdrop:transition-discrete backdrop:duration-200
+           open:backdrop:opacity-100 starting:open:backdrop:opacity-0">
+    <div class="flex flex-col items-center text-center">
+        <span data-confirm-icon class="grid size-12 place-items-center rounded-full">
+            <span data-icon="danger" class="hidden"><x-icon name="trash-2" :size="22" /></span>
+            <span data-icon="warning" class="hidden"><x-icon name="triangle-alert" :size="22" /></span>
+        </span>
+        <h2 id="confirm-dialog-title" data-confirm-title class="mt-4 text-lg font-semibold"></h2>
+        <p id="confirm-dialog-message" data-confirm-message class="mt-1.5 text-sm text-muted"></p>
+    </div>
+    <div class="mt-6 grid grid-cols-2 gap-2">
+        <button type="button" data-confirm-cancel class="btn btn-outline">Batal</button>
+        <button type="button" data-confirm-ok class="btn"></button>
+    </div>
+</dialog>
+
 {{-- Notifikasi toast (global): pesan flash dari server atau showToast() dari JavaScript --}}
 <div class="pointer-events-none fixed inset-x-0 top-5 z-[60] flex justify-center px-4 sm:inset-x-auto sm:right-6 sm:justify-end" aria-live="polite">
     <div data-toast-box class="pointer-events-auto invisible flex w-full max-w-sm translate-y-2 items-start gap-3 rounded-2xl border bg-white p-4 opacity-0 shadow-xl shadow-black/10 transition-all duration-300">
@@ -329,9 +350,57 @@
     box.querySelector('[data-toast-close]').addEventListener('click', hide);
 })();
 
+// Modal konfirmasi global. Mengembalikan Promise<boolean>: true bila pengguna menekan tombol konfirmasi.
+// tone: 'danger' (merah, untuk hapus) atau 'warning'.
+(function () {
+    const dialog = document.getElementById('confirm-dialog');
+    const okBtn = dialog.querySelector('[data-confirm-ok]');
+    const iconBox = dialog.querySelector('[data-confirm-icon]');
+    const tones = {
+        danger: { icon: 'bg-red-100 text-red-600', ok: 'bg-red-600 text-white hover:bg-red-700' },
+        warning: { icon: 'bg-amber-100 text-amber-600', ok: 'btn-primary' },
+    };
+    let resolver = null;
+
+    const finish = (value) => {
+        if (!resolver) return;
+        const resolve = resolver;
+        resolver = null;
+        if (dialog.open) dialog.close();
+        resolve(value);
+    };
+
+    okBtn.addEventListener('click', () => finish(true));
+    dialog.querySelector('[data-confirm-cancel]').addEventListener('click', () => finish(false));
+    // Esc. Event 'close' asinkron: abaikan bila dialog sudah dibuka lagi untuk permintaan baru.
+    dialog.addEventListener('close', () => { if (!dialog.open) finish(false); });
+    dialog.addEventListener('click', (e) => {
+        const r = dialog.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) finish(false);
+    });
+
+    window.confirmDialog = ({ title = 'Apakah Anda yakin?', message = '', confirmText = 'Ya, lanjutkan', tone = 'danger' } = {}) => {
+        finish(false); // tutup permintaan sebelumnya bila masih terbuka
+        const t = tones[tone] ?? tones.danger;
+        dialog.querySelector('[data-confirm-title]').textContent = title;
+        dialog.querySelector('[data-confirm-message]').textContent = message;
+        iconBox.className = 'grid size-12 place-items-center rounded-full ' + t.icon;
+        dialog.querySelectorAll('[data-icon]').forEach((el) => el.classList.toggle('hidden', el.dataset.icon !== tone));
+        okBtn.className = 'btn ' + t.ok;
+        okBtn.textContent = confirmText;
+        dialog.showModal();
+        okBtn.focus();
+        return new Promise((resolve) => (resolver = resolve));
+    };
+})();
+
 // Hapus data lewat fetch DELETE. Selalu memberi umpan balik, termasuk saat sesi/CSRF kedaluwarsa.
-window.deleteResource = async (url, { confirmText = 'Yakin ingin menghapus data ini?', redirect = null } = {}) => {
-    if (!confirm(confirmText)) return;
+window.deleteResource = async (url, {
+    title = 'Hapus data?',
+    confirmText = 'Data yang dihapus tidak dapat dikembalikan.',
+    redirect = null,
+} = {}) => {
+    if (!(await confirmDialog({ title, message: confirmText, confirmText: 'Ya, hapus', tone: 'danger' }))) return;
     try {
         const res = await fetch(url, {
             method: 'DELETE',

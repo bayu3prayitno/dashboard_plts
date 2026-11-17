@@ -15,7 +15,7 @@
             <a href="{{ route('gateway.edit', $gateway) }}" class="btn btn-outline bg-white">
                 <x-icon name="pencil" :size="15" /> Ubah identitas
             </a>
-            <button type="button" onclick="deleteGateway()" class="btn btn-outline bg-white text-red-600">Hapus</button>
+            <button type="button" onclick="deleteResource(@js(route('gateway.delete', $gateway)), { title: 'Hapus gateway?', confirmText: @js('Gateway '.$gateway->name.' akan dihapus permanen.'), redirect: @js(route('gateway.index')) })" class="btn btn-outline bg-white text-red-600">Hapus</button>
         </div>
     </div>
 
@@ -101,18 +101,3 @@
     </div>
 @endsection
 
-@push('scripts')
-<script>
-async function deleteGateway() {
-    if (!confirm('Apakah Anda yakin ingin menghapus gateway ini?')) return;
-
-    const res = await fetch("{{ route('gateway.delete', $gateway) }}", {
-        method: 'DELETE',
-        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-    });
-    const data = await res.json();
-    showToast(data.message, data.success ? 'success' : 'error');
-    if (data.success) setTimeout(() => window.location.href = "{{ route('gateway.index') }}", 1000);
-}
-</script>
-@endpush

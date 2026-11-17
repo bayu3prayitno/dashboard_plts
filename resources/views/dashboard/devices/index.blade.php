@@ -81,7 +81,7 @@
                         <div class="flex gap-2">
                             <a href="{{ route('devices.show', $device) }}" class="text-primary hover:underline font-semibold">Lihat</a>
                             <a href="{{ route('devices.edit', $device) }}" class="text-yellow-600 hover:text-yellow-800 font-semibold">Edit</a>
-                            <button type="button" onclick="deleteResource(@js(route('devices.delete', $device)), { confirmText: 'Apakah Anda yakin ingin menghapus perangkat ini?' })" class="text-red-600 hover:text-red-800 font-semibold">Hapus</button>
+                            <button type="button" onclick="deleteResource(@js(route('devices.delete', $device)), { title: 'Hapus perangkat?', confirmText: @js('Perangkat '.$device->name.' akan dihapus permanen.') })" class="text-red-600 hover:text-red-800 font-semibold">Hapus</button>
                         </div>
                     </td>
                 </tr>
