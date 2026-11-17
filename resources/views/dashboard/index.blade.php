@@ -464,57 +464,43 @@
     new ResizeObserver(() => draw()).observe(box);
 })();
 
-// Real-time polling untuk dashboard data setiap 5 detik
+// Real-time alerts polling saja (notifikasi otomatis)
 (function () {
-    const updateDashboard = async () => {
+    const pollAlerts = async () => {
         try {
-            const res = await fetch('/api/live/dashboard');
+            const res = await fetch('/api/live/alerts');
             const data = await res.json();
 
-            // Update tile counts
-            const tiles = {
-                'total': () => document.querySelectorAll('[data-tile="devices"]'),
-                'online': () => document.querySelectorAll('[data-tile="online"]'),
-                'offline': () => document.querySelectorAll('[data-tile="offline"]'),
-                'alerts': () => document.querySelectorAll('[data-tile="alerts"]'),
-            };
+            // Update alert count tile
+            const alertTiles = document.querySelectorAll('[data-tile="alerts"]');
+            alertTiles.forEach(tile => {
+                const countEl = tile.querySelector('[data-count]');
+                if (countEl) countEl.textContent = data.count ?? 0;
+            });
 
-            // Update device measurements dalam tabel (jika ada)
-            if (data.devices && document.querySelector('[data-devices-table]')) {
-                data.devices.forEach(d => {
-                    const row = document.querySelector(`[data-device-id="${d.id}"]`);
-                    if (row) {
-                        // Update status badge
-                        const status = row.querySelector('[data-status]');
-                        if (status) {
-                            status.dataset.status = d.status;
-                            status.textContent = d.status === 'online' ? '🟢 Online' : d.status === 'offline' ? '🔴 Offline' : '⚫ Nonaktif';
-                        }
-                        // Update measurements
-                        Object.keys(d.latest || {}).forEach(key => {
-                            const cell = row.querySelector(`[data-sensor="${key}"]`);
-                            if (cell && d.latest[key] !== null) {
-                                cell.textContent = d.latest[key].toFixed(1);
-                            }
-                        });
-                    }
-                });
-            }
-
-            // Update gateway status (jika ada)
-            const gwCard = document.querySelector('[data-gateway-card]');
-            if (gwCard && data.gateway) {
-                gwCard.dataset.status = data.gateway.status;
-                gwCard.querySelector('[data-gw-status]').textContent = data.gateway.status;
+            // Update alerts section jika ada
+            const alertsSection = document.querySelector('[data-alerts-section]');
+            if (alertsSection && data.alerts?.length) {
+                const alertsList = alertsSection.querySelector('ul');
+                if (alertsList) {
+                    alertsList.innerHTML = data.alerts.slice(0, 3).map(a => `
+                        <li class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-canvas p-3">
+                            <div class="min-w-0 flex-1 basis-48">
+                                <p class="flex flex-wrap items-center gap-2 text-sm font-semibold">${a.device}</p>
+                                <p class="mt-1 text-xs text-muted">${a.text}</p>
+                            </div>
+                        </li>
+                    `).join('');
+                }
             }
         } catch (e) {
-            console.debug('Dashboard poll error:', e);
+            console.debug('Alerts poll error:', e);
         }
     };
 
-    // Start polling
-    updateDashboard();
-    setInterval(updateDashboard, 5000);
+    // Poll alerts setiap 15 detik saja (notifikasi)
+    pollAlerts();
+    setInterval(pollAlerts, 15000);
 })();
 </script>
 @endpush
