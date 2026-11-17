@@ -43,7 +43,7 @@
             </div>
             <div class="mt-6 pt-6 border-t border-line flex gap-2">
                 <a href="{{ route('devices.edit', $device) }}" class="flex-1 btn btn-primary text-center">Edit</a>
-                <button onclick="deleteDevice({{ $device->id }})" class="flex-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Hapus</button>
+                <button type="button" onclick="deleteResource(@js(route('devices.delete', $device)), { confirmText: 'Apakah Anda yakin ingin menghapus perangkat ini?', redirect: @js(route('devices.index')) })" class="flex-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Hapus</button>
             </div>
         </div>
 
@@ -255,18 +255,6 @@ function copyFirmwareConfig() {
     navigator.clipboard.writeText(text)
         .then(() => showToast('Konfigurasi disalin.', 'success'))
         .catch(() => showToast('Gagal menyalin. Salin secara manual.', 'error'));
-}
-
-async function deleteDevice(id) {
-    if (!confirm('Apakah Anda yakin ingin menghapus perangkat ini?')) return;
-
-    const res = await fetch(`/devices/${id}`, {
-        method: 'DELETE',
-        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-    });
-    const data = await res.json();
-    showToast(data.message, data.success ? 'success' : 'error');
-    if (data.success) setTimeout(() => window.location.href = "{{ route('devices.index') }}", 1000);
 }
 </script>
 @endsection

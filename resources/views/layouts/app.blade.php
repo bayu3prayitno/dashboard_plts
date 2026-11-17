@@ -328,6 +328,31 @@
 
     box.querySelector('[data-toast-close]').addEventListener('click', hide);
 })();
+
+// Hapus data lewat fetch DELETE. Selalu memberi umpan balik, termasuk saat sesi/CSRF kedaluwarsa.
+window.deleteResource = async (url, { confirmText = 'Yakin ingin menghapus data ini?', redirect = null } = {}) => {
+    if (!confirm(confirmText)) return;
+    try {
+        const res = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                'Accept': 'application/json',
+            },
+        });
+        if (res.status === 401) return (window.location.href = @json(route('login')));
+        if (res.status === 419) return showToast('Sesi kedaluwarsa. Muat ulang halaman lalu coba lagi.', 'error');
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            return showToast(data.message ?? `Gagal menghapus (HTTP ${res.status}).`, 'error');
+        }
+        showToast(data.message ?? 'Data berhasil dihapus.', 'success');
+        setTimeout(() => (redirect ? (window.location.href = redirect) : window.location.reload()), 1000);
+    } catch (e) {
+        showToast('Tidak dapat menghubungi server. Coba lagi.', 'error');
+    }
+};
 </script>
 @if(session('success'))
 <script>document.addEventListener('DOMContentLoaded', () => showToast(@json(session('success')), 'success'));</script>

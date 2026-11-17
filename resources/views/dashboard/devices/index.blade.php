@@ -81,7 +81,7 @@
                         <div class="flex gap-2">
                             <a href="{{ route('devices.show', $device) }}" class="text-primary hover:underline font-semibold">Lihat</a>
                             <a href="{{ route('devices.edit', $device) }}" class="text-yellow-600 hover:text-yellow-800 font-semibold">Edit</a>
-                            <button onclick="deleteDevice({{ $device->id }})" class="text-red-600 hover:text-red-800 font-semibold">Hapus</button>
+                            <button type="button" onclick="deleteResource(@js(route('devices.delete', $device)), { confirmText: 'Apakah Anda yakin ingin menghapus perangkat ini?' })" class="text-red-600 hover:text-red-800 font-semibold">Hapus</button>
                         </div>
                     </td>
                 </tr>
@@ -100,18 +100,4 @@
         <x-pagination :paginator="$devices" />
     </div>
 </div>
-
-<script>
-async function deleteDevice(id) {
-    if (!confirm('Apakah Anda yakin ingin menghapus perangkat ini?')) return;
-
-    const res = await fetch(`/devices/${id}`, {
-        method: 'DELETE',
-        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-    });
-    const data = await res.json();
-    showToast(data.message, data.success ? 'success' : 'error');
-    if (data.success) setTimeout(() => window.location.reload(), 1000);
-}
-</script>
 @endsection
