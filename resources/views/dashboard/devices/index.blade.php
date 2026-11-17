@@ -9,15 +9,15 @@
     <!-- Action Bar -->
     <div class="flex justify-between items-center">
         <div class="flex gap-3">
-            <input type="text" placeholder="Cari perangkat..." class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <select class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="text" placeholder="Cari perangkat..." class="px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary">
+            <select class="px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary">
                 <option>Semua Status</option>
                 <option>Online</option>
                 <option>Offline</option>
                 <option>Nonaktif</option>
             </select>
         </div>
-        <a href="{{ route('devices.create') }}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+        <a href="{{ route('devices.create') }}" class="btn btn-primary flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
             </svg>
@@ -26,30 +26,30 @@
     </div>
 
     <!-- Devices Table -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="card overflow-hidden p-0">
         <table class="w-full">
-            <thead class="bg-gray-50 border-b border-gray-200">
+            <thead class="bg-canvas/60 border-b border-line">
                 <tr>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">ID Perangkat</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nama Perangkat</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Lokasi</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Gateway</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Update Terakhir</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Aksi</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">ID Perangkat</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Nama Perangkat</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Lokasi</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Gateway</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Status</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Update Terakhir</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Aksi</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody class="divide-y divide-line">
                 @forelse($devices as $device)
                 @php $status = $device->status(); @endphp
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm text-gray-800 font-mono">DEVICE_{{ str_pad($device->node_id, 3, '0', STR_PAD_LEFT) }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-800">{{ $device->name }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $device->location }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $device->gateway?->name ?? '-' }}</td>
+                <tr class="hover:bg-canvas/60">
+                    <td class="px-6 py-4 text-sm text-ink font-mono">DEVICE_{{ str_pad($device->node_id, 3, '0', STR_PAD_LEFT) }}</td>
+                    <td class="px-6 py-4 text-sm text-ink">{{ $device->name }}</td>
+                    <td class="px-6 py-4 text-sm text-muted">{{ $device->location }}</td>
+                    <td class="px-6 py-4 text-sm text-muted">{{ $device->gateway?->name ?? '-' }}</td>
                     <td class="px-6 py-4 text-sm">
                         @if($status === 'online')
-                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-soft text-lime-dark">
                                 <span class="inline-block w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></span>
                                 Online
                             </span>
@@ -59,16 +59,16 @@
                                 Offline
                             </span>
                         @else
-                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-                                <span class="inline-block w-2 h-2 bg-gray-600 rounded-full mr-2"></span>
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-canvas text-ink">
+                                <span class="inline-block w-2 h-2 bg-muted rounded-full mr-2"></span>
                                 Nonaktif
                             </span>
                         @endif
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $device->last_seen_at?->diffForHumans() ?? 'Belum ada data' }}</td>
+                    <td class="px-6 py-4 text-sm text-muted">{{ $device->last_seen_at?->diffForHumans() ?? 'Belum ada data' }}</td>
                     <td class="px-6 py-4 text-sm">
                         <div class="flex gap-2">
-                            <a href="{{ route('devices.show', $device) }}" class="text-blue-600 hover:text-blue-800 font-semibold">Lihat</a>
+                            <a href="{{ route('devices.show', $device) }}" class="text-primary hover:underline font-semibold">Lihat</a>
                             <a href="{{ route('devices.edit', $device) }}" class="text-yellow-600 hover:text-yellow-800 font-semibold">Edit</a>
                             <button onclick="deleteDevice({{ $device->id }})" class="text-red-600 hover:text-red-800 font-semibold">Hapus</button>
                         </div>
@@ -76,7 +76,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">Belum ada perangkat terdaftar.</td>
+                    <td colspan="7" class="px-6 py-4 text-center text-sm text-muted">Belum ada perangkat terdaftar.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -84,7 +84,7 @@
     </div>
 
     <!-- Pagination -->
-    <div class="flex justify-between items-center text-sm text-gray-600">
+    <div class="flex justify-between items-center text-sm text-muted">
         <span>Menampilkan {{ $devices->count() }} dari {{ $devices->total() }} perangkat</span>
         {{ $devices->links() }}
     </div>

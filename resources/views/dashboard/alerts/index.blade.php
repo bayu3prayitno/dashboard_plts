@@ -7,21 +7,21 @@
 @section('content')
 <div class="space-y-6">
     <!-- Filter Bar -->
-    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-white p-4 rounded-lg shadow">
+    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 card">
         <form method="GET" action="{{ route('alerts.index') }}" class="flex flex-wrap gap-3">
-            <select name="status" onchange="this.form.submit()" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select name="status" onchange="this.form.submit()" class="px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary">
                 <option value="">Semua Status</option>
                 <option value="new" @selected($filters['status'] === 'new')>Baru</option>
                 <option value="acknowledged" @selected($filters['status'] === 'acknowledged')>Ditangani</option>
                 <option value="resolved" @selected($filters['status'] === 'resolved')>Selesai</option>
             </select>
-            <select name="type" onchange="this.form.submit()" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select name="type" onchange="this.form.submit()" class="px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary">
                 <option value="">Semua Tipe</option>
                 <option value="threshold" @selected($filters['type'] === 'threshold')>Threshold Breach</option>
                 <option value="offline" @selected($filters['type'] === 'offline')>Device Offline</option>
             </select>
         </form>
-        <a href="{{ route('alerts.configuration') }}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 self-start md:self-auto">
+        <a href="{{ route('alerts.configuration') }}" class="btn btn-primary flex items-center gap-2 self-start md:self-auto">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
             </svg>
@@ -30,20 +30,20 @@
     </div>
 
     <!-- Alerts Table -->
-    <div class="bg-white rounded-lg shadow overflow-x-auto">
+    <div class="card overflow-x-auto">
         <table class="w-full">
-            <thead class="bg-gray-50 border-b border-gray-200">
+            <thead class="bg-canvas/60 border-b border-line">
                 <tr>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Tipe Alert</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Perangkat</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Pesan</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Waktu Kejadian</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status Penanganan</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Tipe Alert</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Perangkat</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Pesan</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Waktu Kejadian</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Status Penanganan</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody class="divide-y divide-line">
                 @forelse($alerts as $alert)
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-canvas/60">
                     <td class="px-6 py-4 text-sm">
                         @if($alert->alert_type === \App\Models\Alert::TYPE_OFFLINE)
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
@@ -55,26 +55,26 @@
                             </span>
                         @endif
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-800 font-semibold">
+                    <td class="px-6 py-4 text-sm text-ink font-semibold">
                         {{ $alert->device?->name ?? '-' }}
-                        <span class="block text-xs font-normal text-gray-500">Node {{ $alert->device?->node_id }}</span>
+                        <span class="block text-xs font-normal text-muted">Node {{ $alert->device?->node_id }}</span>
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $alert->message() }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{{ $alert->triggered_at->timezone(\App\Http\Controllers\DashboardController::tz())->format('d M Y H:i') }}</td>
+                    <td class="px-6 py-4 text-sm text-muted">{{ $alert->message() }}</td>
+                    <td class="px-6 py-4 text-sm text-muted whitespace-nowrap">{{ $alert->triggered_at->timezone(\App\Http\Controllers\DashboardController::tz())->format('d M Y H:i') }}</td>
                     <td class="px-6 py-4 text-sm">
-                        <select onchange="updateAlertStatus('{{ route('alerts.updateStatus', $alert) }}', this.value)" class="px-3 py-1 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select onchange="updateAlertStatus('{{ route('alerts.updateStatus', $alert) }}', this.value)" class="px-3 py-1 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary">
                             <option value="new" @selected($alert->status === 'new')>Baru</option>
                             <option value="acknowledged" @selected($alert->status === 'acknowledged')>Ditangani</option>
                             <option value="resolved" @selected($alert->status === 'resolved')>Selesai</option>
                         </select>
                         @if($alert->resolution_note)
-                            <span class="block text-xs text-gray-500 mt-1 hidden">{{ $alert->resolution_note }}</span>
+                            <span class="block text-xs text-muted mt-1 hidden">{{ $alert->resolution_note }}</span>
                         @endif
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">Tidak ada alert untuk filter ini.</td>
+                    <td colspan="5" class="px-6 py-8 text-center text-sm text-muted">Tidak ada alert untuk filter ini.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -82,7 +82,7 @@
     </div>
 
     <!-- Pagination -->
-    <div class="flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-gray-600">
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-muted">
         <span>Menampilkan {{ $alerts->firstItem() ?? 0 }}–{{ $alerts->lastItem() ?? 0 }} dari {{ $alerts->total() }} alert</span>
         {{ $alerts->onEachSide(1)->links() }}
     </div>
@@ -90,16 +90,16 @@
     <!-- Summary -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
         <div class="bg-red-50 rounded-lg p-4">
-            <p class="text-gray-600 text-sm">Alert Baru</p>
+            <p class="text-muted text-sm">Alert Baru</p>
             <p class="text-2xl font-bold text-red-600">{{ $counts['new'] }}</p>
         </div>
         <div class="bg-yellow-50 rounded-lg p-4">
-            <p class="text-gray-600 text-sm">Sedang Ditangani</p>
+            <p class="text-muted text-sm">Sedang Ditangani</p>
             <p class="text-2xl font-bold text-yellow-600">{{ $counts['acknowledged'] }}</p>
         </div>
         <div class="bg-green-50 rounded-lg p-4">
-            <p class="text-gray-600 text-sm">Sudah Selesai</p>
-            <p class="text-2xl font-bold text-green-600">{{ $counts['resolved'] }}</p>
+            <p class="text-muted text-sm">Sudah Selesai</p>
+            <p class="text-2xl font-bold text-lime-dark">{{ $counts['resolved'] }}</p>
         </div>
     </div>
 </div>

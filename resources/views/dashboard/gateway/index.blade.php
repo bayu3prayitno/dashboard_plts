@@ -15,56 +15,56 @@
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="bg-white rounded-lg shadow p-6">
-            <p class="text-gray-600 text-sm">Total Gateway</p>
-            <p class="text-3xl font-bold text-gray-800">{{ $gateways->count() }}</p>
+        <div class="card">
+            <p class="text-muted text-sm">Total Gateway</p>
+            <p class="text-3xl font-bold text-ink">{{ $gateways->count() }}</p>
         </div>
-        <div class="bg-white rounded-lg shadow p-6">
-            <p class="text-gray-600 text-sm">Gateway Online</p>
-            <p class="text-3xl font-bold text-green-600">{{ $gateways->where('status', 'online')->count() }}</p>
+        <div class="card">
+            <p class="text-muted text-sm">Gateway Online</p>
+            <p class="text-3xl font-bold text-lime-dark">{{ $gateways->where('status', 'online')->count() }}</p>
         </div>
-        <div class="bg-white rounded-lg shadow p-6">
-            <p class="text-gray-600 text-sm">Gateway Offline</p>
+        <div class="card">
+            <p class="text-muted text-sm">Gateway Offline</p>
             <p class="text-3xl font-bold text-red-600">{{ $gateways->where('status', 'offline')->count() }}</p>
         </div>
-        <div class="bg-white rounded-lg shadow p-6">
-            <p class="text-gray-600 text-sm">Total Node</p>
-            <p class="text-3xl font-bold text-blue-600">{{ $gateways->sum('devices_count') }}</p>
+        <div class="card">
+            <p class="text-muted text-sm">Total Node</p>
+            <p class="text-3xl font-bold text-primary">{{ $gateways->sum('devices_count') }}</p>
         </div>
     </div>
 
     <!-- Gateways Table -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="card overflow-hidden p-0">
         <table class="w-full">
-            <thead class="bg-gray-50 border-b border-gray-200">
+            <thead class="bg-canvas/60 border-b border-line">
                 <tr>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nama Gateway</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Kode</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Status Koneksi</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">MQTT</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Internet</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Jumlah Node</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Komunikasi Terakhir</th>
-                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Aksi</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Nama Gateway</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Kode</th>
+                    <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Status Koneksi</th>
+                    <th class="px-6 py-3 text-center text-sm font-semibold text-ink">MQTT</th>
+                    <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Internet</th>
+                    <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Jumlah Node</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Komunikasi Terakhir</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Aksi</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody class="divide-y divide-line">
                 @forelse($gateways as $gateway)
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{ $gateway->name }}</td>
-                    <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ $gateway->gateway_code }}</td>
+                <tr class="hover:bg-canvas/60">
+                    <td class="px-6 py-4 text-sm font-semibold text-ink">{{ $gateway->name }}</td>
+                    <td class="px-6 py-4 text-sm font-mono text-muted">{{ $gateway->gateway_code }}</td>
                     <td class="px-6 py-4 text-center"><x-status-badge :status="$gateway->status" /></td>
                     <td class="px-6 py-4 text-center"><x-status-badge :status="$gateway->mqtt_status" /></td>
                     <td class="px-6 py-4 text-center"><x-status-badge :status="$gateway->internet_status" /></td>
-                    <td class="px-6 py-4 text-center text-sm font-semibold text-gray-800">{{ $gateway->devices_count }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ Format::relTime($gateway->last_seen_at) }}</td>
+                    <td class="px-6 py-4 text-center text-sm font-semibold text-ink">{{ $gateway->devices_count }}</td>
+                    <td class="px-6 py-4 text-sm text-muted">{{ Format::relTime($gateway->last_seen_at) }}</td>
                     <td class="px-6 py-4 text-sm">
-                        <a href="{{ route('gateway.show', $gateway) }}" class="text-blue-600 hover:text-blue-800 font-semibold">Detail</a>
+                        <a href="{{ route('gateway.show', $gateway) }}" class="text-primary hover:underline font-semibold">Detail</a>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">Belum ada gateway terdaftar.</td>
+                    <td colspan="8" class="px-6 py-4 text-center text-sm text-muted">Belum ada gateway terdaftar.</td>
                 </tr>
                 @endforelse
             </tbody>
