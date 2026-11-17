@@ -8,6 +8,7 @@ use App\Services\MqttSettings;
 use App\Services\TelemetryIngestor;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use PhpMqtt\Client\ConnectionSettings;
 use PhpMqtt\Client\MqttClient;
@@ -32,11 +33,19 @@ class MqttSubscribe extends Command
     /** Seberapa sering (detik) kode MQTT diperiksa apakah sudah berubah. */
     private const CODE_CHECK_INTERVAL = 300;
 
+    /** Jeda reconnect (detik): naik bertahap sampai batas ini selama broker/DB belum bisa dihubungi. */
+    private const RETRY_MAX_DELAY = 30;
+
     public function handle(TelemetryIngestor $ingestor, GatewayStatusUpdater $statusUpdater): int
     {
         $codeVersion = $this->codeVersion();
+        $delay = 2;
 
+        // Loop luar: SETIAP kegagalan (broker putus, DB mati, setting berubah) kembali ke sini,
+        // membuat klien baru, lalu connect ulang. Tidak ada jalur yang membuat proses berhenti.
         while (true) {
+            $client = null;
+
             try {
                 // Dibaca ulang setiap (re)connect dari menu Pengaturan Sistem
                 $config = MqttSettings::current();
@@ -45,57 +54,32 @@ class MqttSubscribe extends Command
                 $settings = (new ConnectionSettings)
                     ->setUsername($config['username'])
                     ->setPassword($config['password'])
-                    ->setUseTls($config['tls']);
+                    ->setUseTls($config['tls'])
+                    ->setConnectTimeout(5)
+                    ->setKeepAliveInterval(15);
 
                 // subscriber dengan ID sama akan saling memutus koneksi.
-                $clientId = $config['client_id'].'-'.getmypid();
-                $client = new MqttClient($config['host'], $config['port'], $clientId);
+                $client = new MqttClient($config['host'], $config['port'], $config['client_id'].'-'.getmypid());
                 $client->connect($settings, true);
 
+                $client->subscribe($config['topic'], fn (string $topic, string $message) => $this->handleMessage($topic, $message, $ingestor), 0);
+                $client->subscribe($config['status_topic'], fn (string $topic, string $message) => $this->handleStatus($topic, $message, $statusUpdater), 0);
+
+                Log::info('MQTT: terhubung', ['host' => $config['host'], 'port' => $config['port']]);
                 $this->info("Terhubung ke broker {$config['host']}:{$config['port']}, topik {$config['topic']}");
+                $delay = 2;
 
-                $client->subscribe($config['topic'], function (string $topic, string $message) use ($ingestor) {
-                    $this->handleMessage($topic, $message, $ingestor);
-                }, 0);
-
-                $client->subscribe($config['status_topic'], function (string $topic, string $message) use ($statusUpdater) {
-                    $this->handleStatus($topic, $message, $statusUpdater);
-                }, 0);
-
-                // Loop dengan deteksi disconnect
                 $lastHeartbeat = 0.0;
                 $lastSettingsCheck = microtime(true);
                 $lastCodeCheck = microtime(true);
-                $isConnected = true;
 
                 while (true) {
-                    try {
-                        // Jika disconnect terdeteksi, reconnect
-                        if (!$isConnected) {
-                            Log::info('MQTT: terdeteksi disconnect, mencoba reconnect...');
-                            $this->warn('Terdeteksi disconnect, mencoba reconnect...');
-                            $client->disconnect();
-                            $client->connect($settings, true);
-                            $client->subscribe($config['topic'], function (string $topic, string $message) use ($ingestor) {
-                                $this->handleMessage($topic, $message, $ingestor);
-                            }, 0);
-                            $client->subscribe($config['status_topic'], function (string $topic, string $message) use ($statusUpdater) {
-                                $this->handleStatus($topic, $message, $statusUpdater);
-                            }, 0);
-                            $isConnected = true;
-                            $this->info('Reconnect berhasil');
-                        }
+                    // Error koneksi di sini dilempar ke catch luar → reconnect dengan klien baru
+                    $client->loopOnce(microtime(true), true);
 
-                        // Gunakan loop dengan timeout 100ms agar responsif
-                        $client->loopOnce(100, true);
-                        $isConnected = true;
-                    } catch (Throwable $e) {
-                        Log::warning('MQTT: loopOnce error', ['error' => $e->getMessage()]);
-                        $isConnected = false;
-                    }
-
+                    // Heartbeat hanya ditulis selama loop benar-benar berjalan (= masih terhubung)
                     if (microtime(true) - $lastHeartbeat >= self::HEARTBEAT_INTERVAL) {
-                        Cache::put(Gateway::MQTT_HEARTBEAT_KEY, time(), now()->addMinutes(10));
+                        $this->safeCache(fn () => Cache::put(Gateway::MQTT_HEARTBEAT_KEY, time(), now()->addMinutes(10)));
                         $lastHeartbeat = microtime(true);
                     }
 
@@ -105,35 +89,62 @@ class MqttSubscribe extends Command
                         if (MqttSettings::fingerprint() !== $settingsVersion) {
                             Log::info('MQTT: setting broker berubah, menyambung ulang');
                             $this->info('Setting MQTT berubah, menyambung ulang...');
-                            Cache::forget(Gateway::MQTT_HEARTBEAT_KEY);
-                            $client->disconnect();
+                            $this->closeQuietly($client);
+                            $delay = 0;
 
-                            continue 2; // ulangi loop luar: baca setting baru lalu connect
+                            continue 2;
                         }
                     }
 
-                    // Kode PHP hanya dimuat sekali saat proses mulai. Jika kode berubah,
-                    // keluar agar wrapper (scripts/mqtt-subscribe.bat) menjalankan ulang dengan kode terbaru.
+                    // Kode PHP hanya dimuat sekali saat proses mulai. Jika kode berubah, keluar dengan
+                    // kode non-nol agar wrapper (scripts/mqtt-subscribe.bat atau concurrently) menjalankan ulang.
                     if (microtime(true) - $lastCodeCheck >= self::CODE_CHECK_INTERVAL) {
                         $lastCodeCheck = microtime(true);
-
                         if ($this->codeVersion() !== $codeVersion) {
                             Log::info('MQTT: kode berubah, subscriber dimulai ulang');
                             $this->info('Kode berubah, memulai ulang subscriber...');
-                            Cache::forget(Gateway::MQTT_HEARTBEAT_KEY);
-                            $client->disconnect();
+                            $this->closeQuietly($client);
 
-                            return self::SUCCESS;
+                            return self::FAILURE;
                         }
                     }
                 }
             } catch (Throwable $e) {
-                // Tandai terputus di web segera, tanpa menunggu heartbeat kedaluwarsa
-                Cache::forget(Gateway::MQTT_HEARTBEAT_KEY);
-                Log::error('MQTT: koneksi terputus, mencoba lagi', ['error' => $e->getMessage()]);
-                $this->warn('Koneksi terputus: '.$e->getMessage().'. Mencoba lagi dalam 5 detik...');
-                sleep(5);
+                // Catch ini TIDAK boleh melempar lagi (dulu Cache::forget ke DB yang mati membuat proses crash)
+                $this->closeQuietly($client);
+                Log::error('MQTT: koneksi terputus, mencoba lagi', ['error' => $e->getMessage(), 'retry_in' => $delay]);
+                $this->warn("Koneksi terputus: {$e->getMessage()}. Mencoba lagi dalam {$delay} detik...");
+
+                // DB mungkin ikut putus; paksa koneksi baru pada percobaan berikutnya
+                try { DB::purge(); } catch (Throwable) {}
+
+                sleep($delay);
+                $delay = min(max($delay * 2, 2), self::RETRY_MAX_DELAY);
             }
+        }
+    }
+
+    /** Tutup klien & tandai terputus di web tanpa pernah melempar exception. */
+    private function closeQuietly(?MqttClient $client): void
+    {
+        $this->safeCache(fn () => Cache::forget(Gateway::MQTT_HEARTBEAT_KEY));
+
+        try {
+            if ($client?->isConnected()) {
+                $client->disconnect();
+            }
+        } catch (Throwable) {
+            // Socket sudah mati; abaikan
+        }
+    }
+
+    /** Operasi cache tidak boleh menjatuhkan subscriber (mis. saat store cache tidak bisa dihubungi). */
+    private function safeCache(callable $fn): void
+    {
+        try {
+            $fn();
+        } catch (Throwable $e) {
+            Log::warning('MQTT: gagal menulis cache', ['error' => $e->getMessage()]);
         }
     }
 
