@@ -15,7 +15,7 @@ use Illuminate\View\View;
 
 class AlertController extends Controller
 {
-    private const PER_PAGE = 15;
+    private const PER_PAGE = 10;
 
     private const STATUSES = [Alert::STATUS_NEW, Alert::STATUS_ACKNOWLEDGED, Alert::STATUS_RESOLVED];
 

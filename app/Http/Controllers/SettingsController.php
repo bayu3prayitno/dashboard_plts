@@ -14,7 +14,7 @@ use Illuminate\View\View;
 
 class SettingsController extends Controller
 {
-    private const PER_PAGE = 20;
+    private const PER_PAGE = 10;
 
     /** Pengaturan sistem yang disimpan di tabel settings, dengan nilai default dan keterangan. */
     private const SYSTEM_KEYS = [

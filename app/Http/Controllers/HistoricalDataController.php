@@ -55,7 +55,7 @@ class HistoricalDataController extends Controller
         'Packet Loss (%)',
     ];
 
-    private const PER_PAGE = 25;
+    private const PER_PAGE = 10;
 
     /** Batas titik pada grafik agar respons tetap ringan. */
     private const CHART_MAX_POINTS = 500;
