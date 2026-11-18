@@ -46,7 +46,7 @@
 
         <div class="relative flex h-full flex-col gap-6 md:min-h-[19rem] md:justify-between">
             <div class="max-w-sm max-md:mx-auto max-md:text-center">
-                <h1 data-hero-title class="text-3xl leading-tight font-medium tracking-tight uppercase transition-colors duration-1000 sm:text-4xl">Monitoring<br>PLTS Cerdas</h1>
+                <h1 data-hero-title class="text-3xl leading-tight font-medium tracking-tight uppercase transition-colors duration-1000 sm:text-4xl">Dashboard<br>Monitoring IoT</h1>
                 <p data-hero-subtitle class="mt-2 text-sm text-muted transition-colors duration-1000">Pantau node sensor dan gateway LoRa secara real-time.</p>
                 <div class="mt-4 flex flex-wrap gap-2 max-md:justify-center">
                     <a href="{{ route('devices.create') }}" class="btn btn-primary hidden"><x-icon name="plus" :size="16" /> Tambah Perangkat</a>
