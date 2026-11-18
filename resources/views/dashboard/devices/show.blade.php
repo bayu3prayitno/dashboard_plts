@@ -142,11 +142,11 @@
                 <div class="flex justify-between gap-4 p-3 bg-canvas/60 rounded"><span class="text-muted">MQTT_TOPIC</span><span class="text-ink break-all text-right">{{ $device->gateway->mqttDataTopic() }}</span></div>
             </div>
 
-            <p class="text-sm text-ink mt-6 mb-2">Pesan yang dikirim Node via LoRa (nilai contoh):</p>
-            <pre class="bg-ink/40 text-lime text-xs p-4 rounded overflow-x-auto">{{ json_encode($nodePayload, JSON_PRETTY_PRINT) }}</pre>
+            <p class="text-sm text-ink mt-6 mb-2 hidden">Pesan yang dikirim Node via LoRa (nilai contoh):</p>
+            <pre class="bg-ink text-lime text-xs p-4 rounded-2xl overflow-x-auto hidden">{{ json_encode($nodePayload, JSON_PRETTY_PRINT) }}</pre>
 
             <p class="text-sm text-ink mt-6 mb-2">Pesan yang diterbitkan Gateway ke MQTT (nilai contoh). RSSI, SNR, dan packet loss ditambahkan Gateway:</p>
-            <pre class="bg-ink/40 text-lime text-xs p-4 rounded overflow-x-auto">{{ json_encode($mqttPayload, JSON_PRETTY_PRINT) }}</pre>
+            <pre class="bg-ink text-lime text-xs p-4 rounded-2xl overflow-x-auto">{{ json_encode($mqttPayload, JSON_PRETTY_PRINT) }}</pre>
             <p class="text-xs text-muted mt-2">Kolom <span class="font-mono">node_id</span> harus sama dengan NODE_ID di atas. <span class="font-mono">packet_no</span> harus bertambah untuk setiap paket.</p>
         @else
             <p class="text-sm text-muted">Perangkat belum terhubung ke Gateway. Edit perangkat dan pilih Gateway untuk melihat konfigurasi.</p>
