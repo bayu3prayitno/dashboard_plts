@@ -5,8 +5,8 @@
 @section('page-subtitle', 'Registrasi node sensor baru ke sistem monitoring')
 
 @section('content')
-<div class="max-w-2xl">
-    <div class="card p-8">
+<div class="grid items-start gap-6 xl:grid-cols-3">
+    <div class="card p-8 xl:col-span-2">
         <form method="POST" action="{{ route('devices.store') }}" class="space-y-6">
             @csrf
 
@@ -54,5 +54,34 @@
             </div>
         </form>
     </div>
+
+    <!-- Panduan -->
+    <aside class="card space-y-5">
+        <div>
+            <h3 class="text-base font-semibold text-ink">Langkah Setelah Disimpan</h3>
+            <p class="text-sm text-muted">Agar data perangkat masuk ke dashboard.</p>
+        </div>
+
+        <ol class="space-y-4 text-sm text-ink">
+            <li class="flex gap-3">
+                <span class="grid size-6 shrink-0 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-lime-dark">1</span>
+                <span>Simpan perangkat, lalu buka detailnya untuk melihat NODE_ID, GATEWAY_CODE, dan MQTT Topic.</span>
+            </li>
+            <li class="flex gap-3">
+                <span class="grid size-6 shrink-0 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-lime-dark">2</span>
+                <span>Masukkan nilai tersebut ke firmware Node.</span>
+            </li>
+            <li class="flex gap-3">
+                <span class="grid size-6 shrink-0 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-lime-dark">3</span>
+                <span>Pastikan Node mengirim <span class="font-mono text-xs">packet_no</span> yang bertambah di setiap paket.</span>
+            </li>
+        </ol>
+
+        @if($gateways->isEmpty())
+            <div class="rounded-2xl bg-red-50 p-4 text-sm text-red-700">
+                Belum ada Gateway. Tambahkan Gateway terlebih dahulu sebelum mendaftarkan perangkat.
+            </div>
+        @endif
+    </aside>
 </div>
 @endsection

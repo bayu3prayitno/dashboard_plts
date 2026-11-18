@@ -5,8 +5,8 @@
 @section('page-subtitle', 'Perbarui informasi perangkat ' . $device->name)
 
 @section('content')
-<div class="max-w-2xl">
-    <div class="card p-8">
+<div class="grid items-start gap-6 xl:grid-cols-3">
+    <div class="card p-8 xl:col-span-2">
         <form method="POST" action="{{ route('devices.update', $device) }}" class="space-y-6">
             @csrf
             @method('PUT')
@@ -63,5 +63,41 @@
             </div>
         </form>
     </div>
+
+    <!-- Ringkasan -->
+    <aside class="card space-y-5">
+        <div>
+            <h3 class="text-base font-semibold text-ink">Ringkasan Perangkat</h3>
+            <p class="text-sm text-muted">Kondisi terkini perangkat ini.</p>
+        </div>
+
+        <dl class="space-y-4 text-sm">
+            <div class="flex items-center justify-between gap-4">
+                <dt class="text-muted">Status</dt>
+                <dd class="font-medium text-ink">
+                    @php $status = $device->status(); @endphp
+                    {{ $status === 'online' ? 'Online' : ($status === 'offline' ? 'Offline' : 'Nonaktif') }}
+                </dd>
+            </div>
+            <div class="flex items-center justify-between gap-4">
+                <dt class="text-muted">Update terakhir</dt>
+                <dd class="text-right text-ink">{{ $device->last_seen_at?->diffForHumans() ?? 'Belum ada data' }}</dd>
+            </div>
+            <div class="flex items-center justify-between gap-4">
+                <dt class="text-muted">Gateway</dt>
+                <dd class="text-right text-ink">{{ $device->gateway?->name ?? '-' }}</dd>
+            </div>
+            @if($device->gateway)
+                <div class="space-y-1">
+                    <dt class="text-muted">MQTT Topic</dt>
+                    <dd class="break-all font-mono text-xs text-ink">{{ $device->gateway->mqttDataTopic() }}</dd>
+                </div>
+            @endif
+        </dl>
+
+        <div class="rounded-2xl bg-canvas/60 p-4 text-sm text-muted">
+            Perubahan gateway atau ID akan memengaruhi topik MQTT yang dipakai firmware Node. Pastikan firmware ikut diperbarui.
+        </div>
+    </aside>
 </div>
 @endsection
