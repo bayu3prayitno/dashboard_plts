@@ -105,11 +105,17 @@
 </div>
 
 <script>
-function updateAlertStatus(url, status) {
+async function updateAlertStatus(url, status) {
     let note = null;
     if (status === 'resolved') {
-        note = prompt('Catatan penyelesaian (opsional):', '');
-        if (note === null) {
+        note = await confirmDialog({
+            title: 'Tandai selesai?',
+            message: 'Alert ini akan ditandai sudah selesai.',
+            confirmText: 'Ya, selesaikan',
+            tone: 'warning',
+            input: { label: 'Catatan penyelesaian (opsional)', placeholder: 'Contoh: sensor sudah dikalibrasi ulang' },
+        });
+        if (note === false) {
             window.location.reload(); // dibatalkan: kembalikan status semula
             return;
         }

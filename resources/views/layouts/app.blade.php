@@ -436,6 +436,10 @@
         <h2 id="confirm-dialog-title" data-confirm-title class="mt-4 text-lg font-semibold"></h2>
         <p id="confirm-dialog-message" data-confirm-message class="mt-1.5 text-sm text-muted"></p>
     </div>
+    <label data-confirm-input class="mt-4 hidden grid gap-2 text-left text-sm font-semibold text-ink">
+        <span data-confirm-input-label></span>
+        <input type="text" data-confirm-input-field class="w-full rounded-full border border-line bg-white px-4 py-2 font-normal outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
+    </label>
     <div class="mt-6 grid grid-cols-2 gap-2">
         <button type="button" data-confirm-cancel class="btn btn-outline">Batal</button>
         <button type="button" data-confirm-ok class="btn"></button>
@@ -495,10 +499,13 @@
 
 // Modal konfirmasi global. Mengembalikan Promise<boolean>: true bila pengguna menekan tombol konfirmasi.
 // tone: 'danger' (merah, untuk hapus) atau 'warning'.
+// input: { label, placeholder, value } menampilkan kolom teks; hasilnya berupa string (isi kolom) atau false bila dibatalkan.
 (function () {
     const dialog = document.getElementById('confirm-dialog');
     const okBtn = dialog.querySelector('[data-confirm-ok]');
     const iconBox = dialog.querySelector('[data-confirm-icon]');
+    const inputWrap = dialog.querySelector('[data-confirm-input]');
+    const inputField = dialog.querySelector('[data-confirm-input-field]');
     const tones = {
         danger: { icon: 'bg-red-100 text-red-600', ok: 'bg-red-600 text-white hover:bg-red-700' },
         warning: { icon: 'bg-amber-100 text-amber-600', ok: 'btn-primary' },
@@ -513,7 +520,7 @@
         resolve(value);
     };
 
-    okBtn.addEventListener('click', () => finish(true));
+    okBtn.addEventListener('click', () => finish(inputWrap.classList.contains('hidden') ? true : inputField.value.trim()));
     dialog.querySelector('[data-confirm-cancel]').addEventListener('click', () => finish(false));
     // Esc. Event 'close' asinkron: abaikan bila dialog sudah dibuka lagi untuk permintaan baru.
     dialog.addEventListener('close', () => { if (!dialog.open) finish(false); });
@@ -522,7 +529,7 @@
         if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) finish(false);
     });
 
-    window.confirmDialog = ({ title = 'Apakah Anda yakin?', message = '', confirmText = 'Ya, lanjutkan', tone = 'danger' } = {}) => {
+    window.confirmDialog = ({ title = 'Apakah Anda yakin?', message = '', confirmText = 'Ya, lanjutkan', tone = 'danger', input = null } = {}) => {
         finish(false); // tutup permintaan sebelumnya bila masih terbuka
         const t = tones[tone] ?? tones.danger;
         dialog.querySelector('[data-confirm-title]').textContent = title;
@@ -531,8 +538,14 @@
         dialog.querySelectorAll('[data-icon]').forEach((el) => el.classList.toggle('hidden', el.dataset.icon !== tone));
         okBtn.className = 'btn ' + t.ok;
         okBtn.textContent = confirmText;
+        inputWrap.classList.toggle('hidden', !input);
+        if (input) {
+            inputWrap.querySelector('[data-confirm-input-label]').textContent = input.label ?? '';
+            inputField.placeholder = input.placeholder ?? '';
+            inputField.value = input.value ?? '';
+        }
         dialog.showModal();
-        okBtn.focus();
+        (input ? inputField : okBtn).focus();
         return new Promise((resolve) => (resolver = resolve));
     };
 })();
