@@ -78,10 +78,21 @@
                     </td>
                     <td class="px-6 py-4 text-sm text-muted">{{ $device->last_seen_at?->diffForHumans() ?? 'Belum ada data' }}</td>
                     <td class="px-6 py-4 text-sm">
-                        <div class="flex gap-2">
-                            <a href="{{ route('devices.show', $device) }}" class="text-primary hover:underline font-semibold">Lihat</a>
-                            <a href="{{ route('devices.edit', $device) }}" class="text-yellow-600 hover:text-yellow-800 font-semibold">Edit</a>
-                            <button type="button" onclick="deleteResource(@js(route('devices.delete', $device)), { title: 'Hapus perangkat?', confirmText: @js('Perangkat '.$device->name.' akan dihapus permanen.') })" class="text-red-600 hover:text-red-800 font-semibold">Hapus</button>
+                        <div class="action-menu">
+                            <button type="button" data-action-toggle aria-haspopup="true" aria-expanded="false" aria-label="Aksi untuk {{ $device->name }}"
+                                    class="p-1.5 rounded-full text-muted hover:bg-canvas hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary/15">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="5" r="1.75"></circle>
+                                    <circle cx="12" cy="12" r="1.75"></circle>
+                                    <circle cx="12" cy="19" r="1.75"></circle>
+                                </svg>
+                            </button>
+                            <div data-action-panel role="menu"
+                                 class="hidden fixed z-50 w-40 py-1 bg-white border border-line rounded-xl shadow-lg">
+                                <a href="{{ route('devices.show', $device) }}" role="menuitem" class="block px-4 py-2 text-sm text-ink hover:bg-canvas">Lihat</a>
+                                <a href="{{ route('devices.edit', $device) }}" role="menuitem" class="block px-4 py-2 text-sm text-ink hover:bg-canvas">Edit</a>
+                                <button type="button" role="menuitem" onclick="deleteResource(@js(route('devices.delete', $device)), { title: 'Hapus perangkat?', confirmText: @js('Perangkat '.$device->name.' akan dihapus permanen.') })" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Hapus</button>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -101,3 +112,43 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(() => {
+    let openPanel = null;
+
+    const close = () => {
+        if (!openPanel) return;
+        openPanel.classList.add('hidden');
+        openPanel.previousElementSibling?.setAttribute('aria-expanded', 'false');
+        openPanel = null;
+    };
+
+    const open = (toggle, panel) => {
+        close();
+        panel.classList.remove('hidden');
+        const r = toggle.getBoundingClientRect();
+        const w = panel.offsetWidth, h = panel.offsetHeight;
+        const top = r.bottom + 4 + h > window.innerHeight ? r.top - h - 4 : r.bottom + 4;
+        panel.style.top = `${Math.max(8, top)}px`;
+        panel.style.left = `${Math.max(8, r.right - w)}px`;
+        toggle.setAttribute('aria-expanded', 'true');
+        openPanel = panel;
+    };
+
+    document.addEventListener('click', (e) => {
+        const toggle = e.target.closest('[data-action-toggle]');
+        if (toggle) {
+            const panel = toggle.nextElementSibling;
+            panel === openPanel ? close() : open(toggle, panel);
+            return;
+        }
+        if (e.target.closest('[data-action-panel] [role="menuitem"]') || !e.target.closest('[data-action-panel]')) close();
+    });
+    document.addEventListener('keydown', (e) => e.key === 'Escape' && close());
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+})();
+</script>
+@endpush
