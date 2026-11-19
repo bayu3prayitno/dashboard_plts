@@ -73,22 +73,18 @@
                 Ingat saya
             </label>
 
-            @if ($errors->any())
+            @if (session('throttle_message'))
+                <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                    {{ session('throttle_message') }}
+                </p>
+            @elseif ($errors->any())
                 <p class="text-sm text-red-700" role="alert">{{ $errors->first() }}</p>
             @endif
 
-            <button type="submit" class="btn btn-primary w-full">Masuk</button>
-
-            @if ($demo)
-                <div class="rounded-2xl bg-canvas p-3 text-xs text-muted">
-                    <p class="font-medium text-ink">Akun demo (kata sandi: password)</p>
-                    <div class="mt-2 flex flex-wrap gap-2">
-                        @foreach ($demo as [$role, $email])
-                            <button type="button" class="btn btn-outline btn-sm" data-demo="{{ $email }}">Isi sebagai {{ $role }}</button>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
+            <button type="submit" class="btn btn-primary w-full" data-login-submit
+                @disabled(session('throttle_retry_after'))>
+                <span data-login-label>Masuk</span>
+            </button>
         </form>
     </div>
 </div>
@@ -98,15 +94,34 @@
     const form = document.querySelector('form');
     const pwd = form.querySelector('[data-password]');
     const toggle = form.querySelector('[data-toggle-password]');
+    const submit = form.querySelector('[data-login-submit]');
+    const label = form.querySelector('[data-login-label]');
+    const retryAfter = @json((int) session('throttle_retry_after', 0));
+
     toggle.addEventListener('click', () => {
         const show = pwd.type === 'password';
         pwd.type = show ? 'text' : 'password';
         toggle.setAttribute('aria-label', show ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
     });
-    form.querySelectorAll('[data-demo]').forEach((b) => b.addEventListener('click', () => {
-        form.login.value = b.dataset.demo;
-        pwd.value = 'password';
-    }));
+
+    if (retryAfter > 0) {
+        let remaining = retryAfter;
+        const updateButton = () => {
+            label.textContent = `Coba lagi (${remaining} detik)`;
+        };
+
+        updateButton();
+        const timer = window.setInterval(() => {
+            remaining -= 1;
+            if (remaining <= 0) {
+                window.clearInterval(timer);
+                submit.disabled = false;
+                label.textContent = 'Masuk';
+                return;
+            }
+            updateButton();
+        }, 1000);
+    }
 })();
 </script>
 </body>

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 
 class LoginController extends Controller
 {
@@ -28,9 +29,12 @@ class LoginController extends Controller
         // Batasi percobaan: 5 kali per menit per (login + IP)
         $key = Str::transliterate(Str::lower($data['login']).'|'.$request->ip());
         if (RateLimiter::tooManyAttempts($key, 5)) {
-            throw ValidationException::withMessages([
-                'login' => 'Terlalu banyak percobaan. Coba lagi dalam '.RateLimiter::availableIn($key).' detik.',
-            ]);
+            $retryAfter = RateLimiter::availableIn($key);
+
+            throw new TooManyRequestsHttpException(
+                $retryAfter,
+                'Terlalu banyak percobaan login.',
+            );
         }
 
         // Boleh masuk dengan email atau username

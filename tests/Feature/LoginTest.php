@@ -71,15 +71,25 @@ class LoginTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_login_is_throttled_after_five_failures(): void
+    public function test_login_is_throttled_with_a_clear_429_response(): void
     {
         for ($i = 0; $i < 5; $i++) {
             $this->post('/login', ['login' => 'x@omahiot.example', 'password' => 'salah']);
         }
 
-        $this->post('/login', ['login' => 'x@omahiot.example', 'password' => 'salah'])
-            ->assertSessionHasErrors('login');
-        $this->assertStringStartsWith('Terlalu banyak percobaan.', session('errors')->first('login'));
+        $response = $this->post('/login', ['login' => 'x@omahiot.example', 'password' => 'salah'])
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('throttle_message');
+
+        $retryAfter = (int) $response->getSession()->get('throttle_retry_after');
+        $this->assertGreaterThanOrEqual(1, $retryAfter);
+        $this->assertLessThanOrEqual(60, $retryAfter);
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('Terlalu banyak percobaan')
+            ->assertSee("const retryAfter = {$retryAfter}")
+            ->assertSee('disabled', false);
     }
 
     public function test_user_can_logout(): void
