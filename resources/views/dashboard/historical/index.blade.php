@@ -50,17 +50,17 @@
                         </select>
                     </div>
 
-                    <!-- Date From -->
+                    <!-- Start -->
                     <div>
-                        <label for="date_from" class="mb-1.5 block text-xs font-medium text-muted">Dari Tanggal</label>
-                        <input id="date_from" type="date" name="date_from" value="{{ $filters['date_from'] }}"
+                        <label for="date_from" class="mb-1.5 block text-xs font-medium text-muted">Awal</label>
+                        <input id="date_from" type="datetime-local" name="date_from" value="{{ $filters['date_from'] }}"
                                class="w-full rounded-full border border-line bg-white px-4 py-2.5 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
                     </div>
 
-                    <!-- Date To -->
+                    <!-- End -->
                     <div>
-                        <label for="date_to" class="mb-1.5 block text-xs font-medium text-muted">Sampai Tanggal</label>
-                        <input id="date_to" type="date" name="date_to" value="{{ $filters['date_to'] }}"
+                        <label for="date_to" class="mb-1.5 block text-xs font-medium text-muted">Sampai</label>
+                        <input id="date_to" type="datetime-local" name="date_to" value="{{ $filters['date_to'] }}"
                                class="w-full rounded-full border border-line bg-white px-4 py-2.5 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
                     </div>
                 </div>
