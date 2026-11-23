@@ -9,6 +9,7 @@ use App\Models\Measurement;
 use App\Models\Threshold;
 use App\Services\TelemetryIngestor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class PartialPayloadTest extends TestCase
@@ -37,5 +38,28 @@ class PartialPayloadTest extends TestCase
         $this->assertNull($m->packet_loss);
         $this->assertSame(Device::STATUS_ONLINE, $device->fresh()->status());
         $this->assertSame(0, Alert::count());
+    }
+
+    public function test_packet_gap_is_logged(): void
+    {
+        $gateway = Gateway::create([
+            'name' => 'Gateway Test', 'status' => 'offline', 'mqtt_status' => 'disconnected', 'internet_status' => 'disconnected',
+        ]);
+        Device::create([
+            'gateway_id' => $gateway->id, 'node_id' => 1, 'name' => 'Node 01', 'location' => 'A', 'is_active' => true,
+        ]);
+
+        Log::spy();
+        $ingestor = app(TelemetryIngestor::class);
+        $ingestor->ingest($gateway->gateway_code, ['node_id' => 1, 'packet_no' => 1]);
+        $ingestor->ingest($gateway->gateway_code, ['node_id' => 1, 'packet_no' => 4]);
+
+        Log::shouldHaveReceived('warning')
+            ->with('MQTT: gap paket terdeteksi', \Mockery::on(function (array $context): bool {
+                return $context['packet_sebelumnya'] === 1
+                    && $context['packet_saat_ini'] === 4
+                    && $context['paket_hilang_tersirat'] === 2;
+            }))
+            ->once();
     }
 }

@@ -58,12 +58,13 @@ class MqttSubscribe extends Command
                     ->setConnectTimeout(5)
                     ->setKeepAliveInterval(15);
 
-                // subscriber dengan ID sama akan saling memutus koneksi.
-                $client = new MqttClient($config['host'], $config['port'], $config['client_id'].'-'.getmypid());
-                $client->connect($settings, true);
+                // Client ID tetap diperlukan untuk sesi MQTT persisten. Tanpa PID,
+                // broker dapat mengirim ulang pesan QoS 1 yang belum diterima saat reconnect.
+                $client = new MqttClient($config['host'], $config['port'], $config['client_id']);
+                $client->connect($settings, false);
 
-                $client->subscribe($config['topic'], fn (string $topic, string $message) => $this->handleMessage($topic, $message, $ingestor), 0);
-                $client->subscribe($config['status_topic'], fn (string $topic, string $message) => $this->handleStatus($topic, $message, $statusUpdater), 0);
+                $client->subscribe($config['topic'], fn (string $topic, string $message) => $this->handleMessage($topic, $message, $ingestor), 1);
+                $client->subscribe($config['status_topic'], fn (string $topic, string $message) => $this->handleStatus($topic, $message, $statusUpdater), 1);
 
                 Log::info('MQTT: terhubung', ['host' => $config['host'], 'port' => $config['port']]);
                 $this->info("Terhubung ke broker {$config['host']}:{$config['port']}, topik {$config['topic']}");

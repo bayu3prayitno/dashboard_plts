@@ -64,8 +64,11 @@ class TelemetryIngestor
 
         // Paket dengan node dan nomor yang sama sudah ada: data lama ditimpa dengan yang baru
         $existing = Measurement::where('device_id', $device->id)->where('packet_no', $data['packet_no'])->first();
+        $previous = $existing ? null : Measurement::where('device_id', $device->id)
+            ->orderByDesc('packet_no')
+            ->first();
 
-        return DB::transaction(function () use ($gateway, $device, $data, $existing) {
+        return DB::transaction(function () use ($gateway, $device, $data, $existing, $previous) {
             $now = now();
 
             $fields = [
@@ -91,6 +94,27 @@ class TelemetryIngestor
                     'packet_no' => $data['packet_no'],
                     ...$fields,
                 ]);
+            }
+
+            if (! $existing && $previous) {
+                $difference = (int) $data['packet_no'] - (int) $previous->packet_no;
+
+                if ($difference > 1) {
+                    Log::warning('MQTT: gap paket terdeteksi', [
+                        'gateway' => $gateway->gateway_code,
+                        'node_id' => $device->node_id,
+                        'packet_sebelumnya' => $previous->packet_no,
+                        'packet_saat_ini' => $data['packet_no'],
+                        'paket_hilang_tersirat' => $difference - 1,
+                    ]);
+                } elseif ($difference < 0) {
+                    Log::info('MQTT: paket diterima tidak berurutan', [
+                        'gateway' => $gateway->gateway_code,
+                        'node_id' => $device->node_id,
+                        'packet_sebelumnya' => $previous->packet_no,
+                        'packet_saat_ini' => $data['packet_no'],
+                    ]);
+                }
             }
 
             // Status online/offline dan MQTT dihitung saat dibaca (lihat Gateway), hanya waktu terakhir yang disimpan
