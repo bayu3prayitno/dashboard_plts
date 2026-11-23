@@ -9,9 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
-#[Fillable(['name', 'status', 'mqtt_status', 'internet_status', 'last_seen_at'])]
+#[Fillable(['name', 'status', 'mqtt_status', 'internet_status', 'last_seen_at', 'internet_last_seen_at'])]
 class Gateway extends Model
 {
+    public const INTERNET_TIMEOUT_MINUTES = 10;
+
     /** Kunci cache tempat subscriber (mqtt:subscribe) menyimpan waktu heartbeat terakhir. */
     public const MQTT_HEARTBEAT_KEY = 'mqtt:subscriber:heartbeat';
 
@@ -33,6 +35,23 @@ class Gateway extends Model
     protected function mqttStatus(): Attribute
     {
         return Attribute::get(fn () => self::subscriberConnected() ? 'connected' : 'disconnected');
+    }
+
+    /**
+     * Status internet dianggap putus bila pesan status true tidak diterima
+     * dalam 10 menit. Pesan false langsung menandai internet terputus.
+     */
+    protected function internetStatus(): Attribute
+    {
+        return Attribute::get(function (?string $value) {
+            if ($value !== 'connected' || $this->internet_last_seen_at === null) {
+                return 'disconnected';
+            }
+
+            return $this->internet_last_seen_at->gte(now()->subMinutes(self::INTERNET_TIMEOUT_MINUTES))
+                ? 'connected'
+                : 'disconnected';
+        });
     }
 
     /**
@@ -72,6 +91,7 @@ class Gateway extends Model
     {
         return [
             'last_seen_at' => 'datetime',
+            'internet_last_seen_at' => 'datetime',
         ];
     }
 

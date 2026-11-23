@@ -34,7 +34,10 @@ class GatewayStatusUpdater
             return false;
         }
 
-        $gateway->update(['internet_status' => $internet ? 'connected' : 'disconnected']);
+        $gateway->update([
+            'internet_status' => $internet ? 'connected' : 'disconnected',
+            'internet_last_seen_at' => now(),
+        ]);
 
         return true;
     }

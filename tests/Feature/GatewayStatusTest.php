@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Gateway;
 use App\Services\GatewayStatusUpdater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 class GatewayStatusTest extends TestCase
@@ -36,5 +37,23 @@ class GatewayStatusTest extends TestCase
         $this->assertFalse($updater->update($gateway->gateway_code, ['internet' => 'mungkin']));
         $this->assertFalse($updater->update('GW-999', ['internet' => true]));
         $this->assertSame('disconnected', $gateway->fresh()->internet_status);
+    }
+
+    public function test_internet_is_disconnected_after_status_is_missing_for_ten_minutes(): void
+    {
+        $gateway = Gateway::create([
+            'name' => 'Gateway Test', 'status' => 'offline', 'mqtt_status' => 'disconnected', 'internet_status' => 'disconnected',
+        ]);
+
+        app(GatewayStatusUpdater::class)->update($gateway->gateway_code, ['internet' => true]);
+        $gateway->update(['internet_last_seen_at' => now()->subMinutes(11)]);
+
+        $this->assertSame('disconnected', $gateway->fresh()->internet_status);
+        $this->assertSame('connected', $gateway->fresh()->getRawOriginal('internet_status'));
+
+        Artisan::call('gateways:check-internet');
+
+        $this->assertSame('disconnected', $gateway->fresh()->internet_status);
+        $this->assertSame('disconnected', $gateway->fresh()->getRawOriginal('internet_status'));
     }
 }
