@@ -10,6 +10,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class DeviceController extends Controller
@@ -146,15 +147,26 @@ class DeviceController extends Controller
 
     public function delete(Request $request, Device $device): JsonResponse
     {
+        if ($device->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Perangkat aktif tidak dapat dihapus. Nonaktifkan perangkat terlebih dahulu.',
+            ], 409);
+        }
+
         $snapshot = $device->getAttributes();
 
         try {
-            $device->delete();
+            DB::transaction(function () use ($device) {
+                $device->measurements()->delete();
+                $device->alerts()->delete();
+                $device->thresholds()->delete();
+                $device->delete();
+            });
         } catch (QueryException) {
-            // Perangkat yang sudah punya data (measurements, alerts, thresholds) tidak boleh dihapus
             return response()->json([
                 'success' => false,
-                'message' => 'Perangkat tidak dapat dihapus karena sudah memiliki riwayat data. Nonaktifkan perangkat saja.',
+                'message' => 'Perangkat tidak dapat dihapus karena terjadi kesalahan pada database.',
             ], 409);
         }
 

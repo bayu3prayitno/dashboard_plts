@@ -43,7 +43,11 @@
             </div>
             <div class="mt-6 pt-6 border-t border-line flex gap-2">
                 <a href="{{ route('devices.edit', $device) }}" class="flex-1 btn btn-primary text-center">Edit</a>
-                <button type="button" onclick="deleteResource(@js(route('devices.delete', $device)), { title: 'Hapus perangkat?', confirmText: @js('Perangkat '.$device->name.' akan dihapus permanen.'), redirect: @js(route('devices.index')) })" class="flex-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Hapus</button>
+                @if($device->is_active)
+                    <button type="button" disabled title="Nonaktifkan perangkat terlebih dahulu" class="flex-1 bg-gray-300 text-gray-600 px-4 py-2 rounded cursor-not-allowed">Hapus</button>
+                @else
+                    <button type="button" onclick="deleteResource(@js(route('devices.delete', $device)), { title: 'Hapus perangkat?', confirmText: @js('Perangkat '.$device->name.' beserta seluruh riwayatnya akan dihapus permanen.'), redirect: @js(route('devices.index')) })" class="flex-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Hapus</button>
+                @endif
             </div>
         </div>
 

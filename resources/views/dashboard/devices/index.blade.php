@@ -91,7 +91,11 @@
                                  class="hidden fixed z-50 w-40 py-1 bg-white border border-line rounded-xl shadow-lg">
                                 <a href="{{ route('devices.show', $device) }}" role="menuitem" class="block px-4 py-2 text-sm text-ink hover:bg-canvas">Lihat</a>
                                 <a href="{{ route('devices.edit', $device) }}" role="menuitem" class="block px-4 py-2 text-sm text-ink hover:bg-canvas">Edit</a>
-                                <button type="button" role="menuitem" onclick="deleteResource(@js(route('devices.delete', $device)), { title: 'Hapus perangkat?', confirmText: @js('Perangkat '.$device->name.' akan dihapus permanen.') })" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Hapus</button>
+                                @if($device->is_active)
+                                    <button type="button" role="menuitem" disabled title="Nonaktifkan perangkat terlebih dahulu" class="block w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed">Hapus</button>
+                                @else
+                                    <button type="button" role="menuitem" onclick="deleteResource(@js(route('devices.delete', $device)), { title: 'Hapus perangkat?', confirmText: @js('Perangkat '.$device->name.' beserta seluruh riwayatnya akan dihapus permanen.') })" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Hapus</button>
+                                @endif
                             </div>
                         </div>
                     </td>
