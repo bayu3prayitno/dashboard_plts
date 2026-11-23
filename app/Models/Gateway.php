@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 
 #[Fillable(['name', 'status', 'mqtt_status', 'internet_status', 'last_seen_at'])]
 class Gateway extends Model
@@ -55,18 +54,12 @@ class Gateway extends Model
 
     protected static function booted(): void
     {
-        // Kode gateway dibuat otomatis dan tidak bisa diisi dari luar.
-        // Saat INSERT dipakai kode sementara yang unik (UUID), lalu setelah ID tersedia
-        // diganti dengan kode dari ID: GW-001, GW-002, dst. ID auto-increment selalu unik,
-        // sehingga kode tidak mungkin duplikat.
+        // Kode gateway dibuat otomatis dengan 128 bit entropi acak kriptografis
+        // dan tidak dapat ditebak dari urutan atau ID database.
         static::creating(function (Gateway $gateway) {
-            $gateway->gateway_code = 'TMP-'.Str::uuid();
-        });
-
-        static::created(function (Gateway $gateway) {
-            // Atribut diisi langsung (bukan lewat fill) karena gateway_code tidak fillable
-            $gateway->gateway_code = 'GW-'.str_pad((string) $gateway->id, 3, '0', STR_PAD_LEFT);
-            $gateway->saveQuietly();
+            do {
+                $gateway->gateway_code = 'GW-'.bin2hex(random_bytes(7));
+            } while (self::where('gateway_code', $gateway->gateway_code)->exists());
         });
     }
 

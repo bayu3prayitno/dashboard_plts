@@ -90,7 +90,7 @@
         <div class="flex items-start justify-between gap-3">
             <div>
                 <h2 id="create-gateway-title" class="text-lg font-semibold">Tambah Gateway</h2>
-                <p class="mt-0.5 text-sm text-muted">Kode gateway dibuat otomatis (contoh: GW-001) dan tidak bisa diubah setelah disimpan.</p>
+                <p class="mt-0.5 text-sm text-muted">Kode gateway dibuat otomatis secara acak dan tidak bisa diubah setelah disimpan.</p>
             </div>
             <button type="button" data-close-modal aria-label="Tutup" class="grid size-9 shrink-0 place-items-center rounded-full text-muted hover:bg-canvas hover:text-ink">
                 <x-icon name="x" :size="18" />
