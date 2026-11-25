@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Gateway;
 use App\Models\Setting;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
@@ -57,6 +58,23 @@ class MqttSettings
         $stored['mqtt_password'] = '';
 
         return $stored;
+    }
+
+    /**
+     * Kode gateway yang menerima data dari topik vpp/kampus/+ (firmware tidak mengirim kode gateway).
+     * Urutan penentuan: setting 'gateway_code' bila diisi; jika kosong dan hanya ada satu gateway,
+     * gateway tersebut. Selain itu null (data tidak bisa dikaitkan ke gateway).
+     */
+    public static function gatewayCode(): ?string
+    {
+        $configured = Setting::query()->where('key', 'gateway_code')->value('value');
+        if (is_string($configured) && $configured !== '') {
+            return $configured;
+        }
+
+        $codes = Gateway::query()->limit(2)->pluck('gateway_code');
+
+        return $codes->count() === 1 ? (string) $codes->first() : null;
     }
 
     /** Sidik jari nilai tersimpan. Subscriber memulai ulang bila nilai ini berubah. */

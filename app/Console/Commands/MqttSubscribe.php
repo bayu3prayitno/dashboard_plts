@@ -170,12 +170,16 @@ class MqttSubscribe extends Command
 
     private function handleMessage(string $topic, string $message, TelemetryIngestor $ingestor): void
     {
-        // omahiot/gateway/{kode_gateway}/data
-        $segments = explode('/', $topic);
-        $gatewayCode = $segments[2] ?? null;
+        // vpp/kampus/{nama_node}: topik tidak memuat kode gateway, jadi gateway ditentukan dari konfigurasi
+        $gatewayCode = MqttSettings::gatewayCode();
+        if ($gatewayCode === null) {
+            Log::warning('MQTT: gateway tujuan tidak ditentukan (isi setting gateway_code atau sisakan satu gateway)', ['topic' => $topic]);
+
+            return;
+        }
 
         $payload = json_decode($message, true);
-        if (! is_array($payload) || $gatewayCode === null) {
+        if (! is_array($payload)) {
             Log::warning('MQTT: pesan bukan JSON yang valid', ['topic' => $topic]);
 
             return;
