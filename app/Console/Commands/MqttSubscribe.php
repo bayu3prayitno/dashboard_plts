@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Gateway;
+use App\Services\LegacyGatewayPayloadAdapter;
 use App\Services\MqttSettings;
 use App\Services\TelemetryIngestor;
 use Illuminate\Console\Command;
@@ -35,7 +36,7 @@ class MqttSubscribe extends Command
     /** Jeda reconnect (detik): naik bertahap sampai batas ini selama broker/DB belum bisa dihubungi. */
     private const RETRY_MAX_DELAY = 30;
 
-    public function handle(TelemetryIngestor $ingestor): int
+    public function handle(TelemetryIngestor $ingestor, LegacyGatewayPayloadAdapter $adapter): int
     {
         $codeVersion = $this->codeVersion();
         $delay = 2;
@@ -62,7 +63,7 @@ class MqttSubscribe extends Command
                 $client = new MqttClient($config['host'], $config['port'], $config['client_id']);
                 $client->connect($settings, false);
 
-                $client->subscribe($config['topic'], fn (string $topic, string $message) => $this->handleMessage($topic, $message, $ingestor), 1);
+                $client->subscribe($config['topic'], fn (string $topic, string $message) => $this->handleMessage($topic, $message, $ingestor, $adapter), 1);
 
                 Log::info('MQTT: terhubung', ['host' => $config['host'], 'port' => $config['port']]);
                 $this->info("Terhubung ke broker {$config['host']}:{$config['port']}, topik {$config['topic']}");
@@ -168,7 +169,7 @@ class MqttSubscribe extends Command
         return count($files).':'.$latest;
     }
 
-    private function handleMessage(string $topic, string $message, TelemetryIngestor $ingestor): void
+    private function handleMessage(string $topic, string $message, TelemetryIngestor $ingestor, LegacyGatewayPayloadAdapter $adapter): void
     {
         // vpp/kampus/{nama_node}: topik tidak memuat kode gateway, jadi gateway ditentukan dari konfigurasi
         $gatewayCode = MqttSettings::gatewayCode();
@@ -178,15 +179,22 @@ class MqttSubscribe extends Command
             return;
         }
 
+        $topicNode = explode('/', $topic)[2] ?? null;
+
         $payload = json_decode($message, true);
-        if (! is_array($payload)) {
+        if (! is_array($payload) || $topicNode === null) {
             Log::warning('MQTT: pesan bukan JSON yang valid', ['topic' => $topic]);
 
             return;
         }
 
         try {
-            $ingestor->ingest($gatewayCode, $payload);
+            $data = $adapter->translate($gatewayCode, $topicNode, $payload);
+            if ($data === null) {
+                return; // alasan sudah dicatat di adapter
+            }
+
+            $ingestor->ingest($gatewayCode, $data);
         } catch (Throwable $e) {
             // Satu pesan yang gagal tidak boleh menghentikan langganan
             Log::error('MQTT: gagal menyimpan data', ['topic' => $topic, 'error' => $e->getMessage()]);
