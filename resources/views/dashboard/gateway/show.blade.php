@@ -9,7 +9,7 @@
     <div class="mb-5 flex flex-wrap items-end justify-between gap-3 px-1">
         <div>
             <h1 class="text-2xl font-semibold sm:text-3xl">{{ $gateway->name }}</h1>
-            <p class="mt-1 text-sm text-muted">Status penerima LoRa, koneksi MQTT, dan internet.</p>
+            <p class="mt-1 text-sm text-muted">Status penerima LoRa, koneksi broker MQTT, dan koneksi server.</p>
         </div>
         <div class="flex gap-2">
             <a href="{{ route('gateway.edit', $gateway) }}" class="btn btn-outline bg-white">
@@ -27,14 +27,14 @@
             <p class="mt-2 text-xs break-all text-muted">{{ $gateway->gateway_code }}</p>
         </section>
         <section class="card">
-            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="server" :size="16" /> MQTT</div>
+            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="server" :size="16" /> Broker MQTT</div>
             <div class="mt-3"><x-status-badge :status="$gateway->mqtt_status" /></div>
-            <p class="mt-2 text-xs text-muted">Broker MQTT</p>
+            <p class="mt-2 text-xs text-muted">Koneksi subscriber server ke broker</p>
         </section>
         <section class="card">
-            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="globe" :size="16" /> Internet</div>
+            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="globe" :size="16" /> Koneksi Server</div>
             <div class="mt-3"><x-status-badge :status="$gateway->internet_status" /></div>
-            <p class="mt-2 text-xs text-muted">Koneksi gateway ke jaringan luar</p>
+            <p class="mt-2 text-xs text-muted">Pesan dari gateway diterima server dalam 15 menit terakhir</p>
         </section>
         <section class="card">
             <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="clock" :size="16" /> Komunikasi terakhir</div>

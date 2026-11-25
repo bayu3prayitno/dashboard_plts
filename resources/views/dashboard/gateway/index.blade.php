@@ -52,8 +52,8 @@
                     <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Nama Gateway</th>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Kode</th>
                     <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Status Koneksi</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-ink">MQTT</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Internet</th>
+                    <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Broker MQTT</th>
+                    <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Koneksi Server</th>
                     <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Jumlah Node</th>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Komunikasi Terakhir</th>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Aksi</th>

@@ -222,7 +222,7 @@
                 </p>
                 <ul class="mt-4 space-y-2 text-sm">
                     @foreach ([
-                        ['server', 'MQTT', $gateway['mqtt_status'] === 'connected' ? 'Terhubung' : 'Terputus'],
+                        ['server', 'Broker MQTT', $gateway['mqtt_status'] === 'connected' ? 'Terhubung' : 'Terputus'],
                         ['globe', 'Koneksi Server', $gateway['internet_status'] === 'connected' ? 'Terhubung' : 'Terputus'],
                         ['radio', 'Data Terakhir', Format::relTime($gateway['last_seen'])],
                     ] as [$icon, $label, $value])
