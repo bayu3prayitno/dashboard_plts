@@ -65,6 +65,13 @@ class Device extends Model
         return $this->belongsTo(Gateway::class);
     }
 
+    public function mqttTopic(): string
+    {
+        $alias = array_search((int) $this->node_id, (array) config('mqtt.node_aliases', []), true);
+
+        return 'vpp/kampus/'.($alias !== false ? $alias : 'node'.$this->node_id);
+    }
+
     public function measurements(): HasMany
     {
         return $this->hasMany(Measurement::class);

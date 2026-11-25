@@ -133,17 +133,22 @@
                     'power' => 14.5,
                     'irradiance' => 650,
                 ];
-                // Gateway menambahkan RSSI, SNR, dan packet loss sebelum menerbitkan ke MQTT
-                $mqttPayload = $nodePayload + [
+                // Firmware gateway menerbitkan ke topik vpp/kampus/{nama}: tanpa node_id dan packet_no
+                // (node_id dari nama topik, packet_no dibuat server)
+                $mqttPayload = [
+                    'temp' => 28.5,
+                    'voltage' => 12.1,
+                    'current' => 1.2,
+                    'power' => 14.5,
+                    'irradiance' => 650,
                     'rssi' => -72,
                     'snr' => 8.5,
-                    'packet_loss' => 0,
                 ];
             @endphp
             <div id="firmware-config" class="space-y-2 font-mono text-sm">
                 <div class="flex justify-between gap-4 p-3 bg-canvas/60 rounded"><span class="text-muted">NODE_ID</span><span class="text-ink">{{ $device->node_id }}</span></div>
                 <div class="flex justify-between gap-4 p-3 bg-canvas/60 rounded"><span class="text-muted">GATEWAY_CODE</span><span class="text-ink">{{ $device->gateway->gateway_code }}</span></div>
-                <div class="flex justify-between gap-4 p-3 bg-canvas/60 rounded"><span class="text-muted">MQTT_TOPIC</span><span class="text-ink break-all text-right">{{ $device->gateway->mqttDataTopic() }}</span></div>
+                <div class="flex justify-between gap-4 p-3 bg-canvas/60 rounded"><span class="text-muted">MQTT_TOPIC</span><span class="text-ink break-all text-right">{{ $device->mqttTopic() }}</span></div>
             </div>
 
             <p class="text-sm text-ink mt-6 mb-2 hidden">Pesan yang dikirim Node via LoRa (nilai contoh):</p>
@@ -151,7 +156,7 @@
 
             <p class="text-sm text-ink mt-6 mb-2">Pesan yang diterbitkan Gateway ke MQTT (nilai contoh). RSSI, SNR, dan packet loss ditambahkan Gateway:</p>
             <pre class="bg-ink text-lime text-xs p-4 rounded-2xl overflow-x-auto">{{ json_encode($mqttPayload, JSON_PRETTY_PRINT) }}</pre>
-            <p class="text-xs text-muted mt-2">Kolom <span class="font-mono">node_id</span> harus sama dengan NODE_ID di atas. <span class="font-mono">packet_no</span> harus bertambah untuk setiap paket.</p>
+            <p class="text-xs text-muted mt-2">Gateway mengirim satu pesan per paket baru. Nama topik menentukan <span class="font-mono">node_id</span>, sehingga nama topik harus sesuai dengan MQTT_TOPIC di atas.</p>
         @else
             <p class="text-sm text-muted">Perangkat belum terhubung ke Gateway. Edit perangkat dan pilih Gateway untuk melihat konfigurasi.</p>
         @endif

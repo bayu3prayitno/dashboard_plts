@@ -90,7 +90,7 @@
             @if($device->gateway)
                 <div class="space-y-1">
                     <dt class="text-muted">MQTT Topic</dt>
-                    <dd class="break-all font-mono text-xs text-ink">{{ $device->gateway->mqttDataTopic() }}</dd>
+                    <dd class="break-all font-mono text-xs text-ink">{{ $device->mqttTopic() }}</dd>
                 </div>
             @endif
         </dl>

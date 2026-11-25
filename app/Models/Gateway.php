@@ -101,10 +101,4 @@ class Gateway extends Model
     {
         return $this->hasMany(Device::class);
     }
-
-    /** Topik MQTT tempat Gateway ini mempublikasikan data (sesuai format yang dibaca MqttSubscribe). */
-    public function mqttDataTopic(): string
-    {
-        return 'omahiot/gateway/'.$this->gateway_code.'/data';
-    }
 }
