@@ -6,38 +6,25 @@ use App\Models\Gateway;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Memperbarui status internet gateway dari pesan status yang diterbitkan gateway.
- * Topik: omahiot/gateway/{kode_gateway}/status, isi: {"internet": true|false}.
+ * Status internet gateway. Firmware tidak mengirim status internet, jadi status dihitung dari
+ * kedatangan pesan: bila pesan dari gateway sampai ke server lewat broker, koneksi internet
+ * gateway berfungsi pada saat itu. Lihat Gateway::internetStatus untuk batas waktunya.
  */
 class GatewayStatusUpdater
 {
-    /** @return bool true bila status tersimpan */
-    public function update(string $gatewayCode, array $payload): bool
+    /** Dipanggil setiap pesan dari gateway diterima subscriber. @return bool true bila gateway dikenal */
+    public function markInternetConnected(string $gatewayCode): bool
     {
-        if (! array_key_exists('internet', $payload)) {
-            Log::warning('MQTT: status gateway tidak memuat field internet', ['gateway' => $gatewayCode]);
-
-            return false;
-        }
-
-        $internet = filter_var($payload['internet'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-        if ($internet === null) {
-            Log::warning('MQTT: nilai internet pada status gateway tidak valid', ['gateway' => $gatewayCode]);
-
-            return false;
-        }
-
-        $gateway = Gateway::where('gateway_code', $gatewayCode)->first();
-        if (! $gateway) {
-            Log::warning('MQTT: status dari gateway tidak dikenal', ['gateway' => $gatewayCode]);
-
-            return false;
-        }
-
-        $gateway->update([
-            'internet_status' => $internet ? 'connected' : 'disconnected',
+        $updated = Gateway::where('gateway_code', $gatewayCode)->update([
+            'internet_status' => 'connected',
             'internet_last_seen_at' => now(),
         ]);
+
+        if ($updated === 0) {
+            Log::warning('MQTT: pesan dari gateway tidak dikenal', ['gateway' => $gatewayCode]);
+
+            return false;
+        }
 
         return true;
     }

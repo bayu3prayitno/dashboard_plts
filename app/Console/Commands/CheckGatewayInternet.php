@@ -5,12 +5,12 @@ namespace App\Console\Commands;
 use App\Models\Gateway;
 use Illuminate\Console\Command;
 
-/** Menandai internet gateway terputus bila status true tidak diterima selama timeout. */
+/** Menandai internet gateway terputus bila tidak ada pesan dari gateway selama timeout. */
 class CheckGatewayInternet extends Command
 {
     protected $signature = 'gateways:check-internet';
 
-    protected $description = 'Periksa status internet gateway berdasarkan heartbeat status MQTT';
+    protected $description = 'Tandai internet gateway terputus bila tidak ada pesan dari gateway selama timeout';
 
     public function handle(): int
     {

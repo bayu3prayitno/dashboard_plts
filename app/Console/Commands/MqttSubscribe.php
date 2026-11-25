@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Gateway;
+use App\Services\GatewayStatusUpdater;
 use App\Services\LegacyGatewayPayloadAdapter;
 use App\Services\MqttSettings;
 use App\Services\TelemetryIngestor;
@@ -36,7 +37,7 @@ class MqttSubscribe extends Command
     /** Jeda reconnect (detik): naik bertahap sampai batas ini selama broker/DB belum bisa dihubungi. */
     private const RETRY_MAX_DELAY = 30;
 
-    public function handle(TelemetryIngestor $ingestor, LegacyGatewayPayloadAdapter $adapter): int
+    public function handle(TelemetryIngestor $ingestor, LegacyGatewayPayloadAdapter $adapter, GatewayStatusUpdater $statusUpdater): int
     {
         $codeVersion = $this->codeVersion();
         $delay = 2;
@@ -63,7 +64,7 @@ class MqttSubscribe extends Command
                 $client = new MqttClient($config['host'], $config['port'], $config['client_id']);
                 $client->connect($settings, false);
 
-                $client->subscribe($config['topic'], fn (string $topic, string $message) => $this->handleMessage($topic, $message, $ingestor, $adapter), 1);
+                $client->subscribe($config['topic'], fn (string $topic, string $message) => $this->handleMessage($topic, $message, $ingestor, $adapter, $statusUpdater), 1);
 
                 Log::info('MQTT: terhubung', ['host' => $config['host'], 'port' => $config['port']]);
                 $this->info("Terhubung ke broker {$config['host']}:{$config['port']}, topik {$config['topic']}");
@@ -169,7 +170,7 @@ class MqttSubscribe extends Command
         return count($files).':'.$latest;
     }
 
-    private function handleMessage(string $topic, string $message, TelemetryIngestor $ingestor, LegacyGatewayPayloadAdapter $adapter): void
+    private function handleMessage(string $topic, string $message, TelemetryIngestor $ingestor, LegacyGatewayPayloadAdapter $adapter, GatewayStatusUpdater $statusUpdater): void
     {
         // vpp/kampus/{nama_node}: topik tidak memuat kode gateway, jadi gateway ditentukan dari konfigurasi
         $gatewayCode = MqttSettings::gatewayCode();
@@ -186,6 +187,13 @@ class MqttSubscribe extends Command
             Log::warning('MQTT: pesan bukan JSON yang valid', ['topic' => $topic]);
 
             return;
+        }
+
+        // Pesan dari gateway sampai ke server = koneksi internet gateway berfungsi saat ini
+        try {
+            $statusUpdater->markInternetConnected($gatewayCode);
+        } catch (Throwable $e) {
+            Log::error('MQTT: gagal memperbarui status internet', ['topic' => $topic, 'error' => $e->getMessage()]);
         }
 
         try {

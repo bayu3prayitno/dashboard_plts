@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Cache;
 #[Fillable(['name', 'status', 'mqtt_status', 'internet_status', 'last_seen_at', 'internet_last_seen_at'])]
 class Gateway extends Model
 {
-    public const INTERNET_TIMEOUT_MINUTES = 10;
+    /** Internet dianggap putus bila tidak ada pesan dari gateway dalam kurun ini (siklus node 5 menit). */
+    public const INTERNET_TIMEOUT_MINUTES = 15;
 
     /** Kunci cache tempat subscriber (mqtt:subscribe) menyimpan waktu heartbeat terakhir. */
     public const MQTT_HEARTBEAT_KEY = 'mqtt:subscriber:heartbeat';
@@ -38,8 +39,8 @@ class Gateway extends Model
     }
 
     /**
-     * Status internet dianggap putus bila pesan status true tidak diterima
-     * dalam 10 menit. Pesan false langsung menandai internet terputus.
+     * Status internet dihitung dari pesan terakhir gateway yang diterima server.
+     * Terhubung bila pesan terakhir masih dalam INTERNET_TIMEOUT_MINUTES.
      */
     protected function internetStatus(): Attribute
     {
