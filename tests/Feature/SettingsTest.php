@@ -63,8 +63,8 @@ class SettingsTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $config = MqttSettings::current();
-        $this->assertSame('omahiot/gateway/+/data', $config['topic']);
-        $this->assertSame('omahiot/gateway/+/status', $config['status_topic']);
+        $this->assertSame('vpp/kampus/+', $config['topic']);
+        $this->assertArrayNotHasKey('status_topic', $config);
         $this->assertNull(Setting::find('mqtt_topic'));
     }
 

@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Gateway;
-use App\Services\GatewayStatusUpdater;
 use App\Services\MqttSettings;
 use App\Services\TelemetryIngestor;
 use Illuminate\Console\Command;
@@ -36,7 +35,7 @@ class MqttSubscribe extends Command
     /** Jeda reconnect (detik): naik bertahap sampai batas ini selama broker/DB belum bisa dihubungi. */
     private const RETRY_MAX_DELAY = 30;
 
-    public function handle(TelemetryIngestor $ingestor, GatewayStatusUpdater $statusUpdater): int
+    public function handle(TelemetryIngestor $ingestor): int
     {
         $codeVersion = $this->codeVersion();
         $delay = 2;
@@ -64,7 +63,6 @@ class MqttSubscribe extends Command
                 $client->connect($settings, false);
 
                 $client->subscribe($config['topic'], fn (string $topic, string $message) => $this->handleMessage($topic, $message, $ingestor), 1);
-                $client->subscribe($config['status_topic'], fn (string $topic, string $message) => $this->handleStatus($topic, $message, $statusUpdater), 1);
 
                 Log::info('MQTT: terhubung', ['host' => $config['host'], 'port' => $config['port']]);
                 $this->info("Terhubung ke broker {$config['host']}:{$config['port']}, topik {$config['topic']}");
@@ -168,25 +166,6 @@ class MqttSubscribe extends Command
         }
 
         return count($files).':'.$latest;
-    }
-
-    /** omahiot/gateway/{kode_gateway}/status: perbarui status internet gateway. */
-    private function handleStatus(string $topic, string $message, GatewayStatusUpdater $statusUpdater): void
-    {
-        $gatewayCode = explode('/', $topic)[2] ?? null;
-
-        $payload = json_decode($message, true);
-        if (! is_array($payload) || $gatewayCode === null) {
-            Log::warning('MQTT: pesan status bukan JSON yang valid', ['topic' => $topic]);
-
-            return;
-        }
-
-        try {
-            $statusUpdater->update($gatewayCode, $payload);
-        } catch (Throwable $e) {
-            Log::error('MQTT: gagal menyimpan status gateway', ['topic' => $topic, 'error' => $e->getMessage()]);
-        }
     }
 
     private function handleMessage(string $topic, string $message, TelemetryIngestor $ingestor): void

@@ -25,16 +25,15 @@ class MqttSettings
     public const CLIENT_ID = 'omahiot-subscriber';
 
     /**
-     * Pola topik tetap (tidak bisa diubah dari menu). Segmen ke-3 adalah kode gateway, dibaca MqttSubscribe.
-     * Topik per gateway: omahiot/gateway/{kode_gateway}/data
+     * Pola topik tetap (tidak bisa diubah dari menu) sesuai firmware gateway yang sudah terpasang:
+     * vpp/kampus/node1, vpp/kampus/node2, vpp/kampus/node3.
      */
-    public const TOPIC = 'omahiot/gateway/+/data';
-    public const STATUS_TOPIC = 'omahiot/gateway/+/status';
+    public const TOPIC = 'vpp/kampus/+';
 
     /**
-     * Nilai efektif untuk subscriber: host, port, username, password (plain atau null), tls, client_id, topic, status_topic.
+     * Nilai efektif untuk subscriber: host, port, username, password (plain atau null), tls, client_id, topic.
      *
-     * @return array{host: string, port: int, username: ?string, password: ?string, tls: bool, client_id: string, topic: string, status_topic: string}
+     * @return array{host: string, port: int, username: ?string, password: ?string, tls: bool, client_id: string, topic: string}
      */
     public static function current(): array
     {
@@ -48,7 +47,6 @@ class MqttSettings
             'tls' => $stored['mqtt_tls'] === '1',
             'client_id' => self::CLIENT_ID,
             'topic' => self::TOPIC,
-            'status_topic' => self::STATUS_TOPIC,
         ];
     }
 
