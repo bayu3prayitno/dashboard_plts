@@ -8,7 +8,7 @@ use App\Models\Measurement;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Menerjemahkan payload firmware gateway (topik vpp/kampus/{kode_gateway}/node{node_id}, JSON tanpa node_id
+ * Menerjemahkan payload firmware gateway (topik vpp/{kode_gateway}/node{node_id}, JSON tanpa node_id
  * dan packet_no) menjadi format yang diterima TelemetryIngestor. Satu-satunya tempat
  * pemetaan format firmware ini.
  *

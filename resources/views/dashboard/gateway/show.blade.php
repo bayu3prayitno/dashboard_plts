@@ -60,7 +60,7 @@
                     <dt class="shrink-0 text-muted">Kode Gateway</dt>
                     <dd class="text-right font-medium break-all">{{ $gateway->gateway_code }}</dd>
                 </div>
-                @php($topicPrefix = 'vpp/kampus/'.$gateway->gateway_code.'/')
+                @php($topicPrefix = 'vpp/'.$gateway->gateway_code.'/')
                 <div>
                     <dt class="text-muted">Topic MQTT</dt>
                     <dd class="mt-1.5 flex items-center gap-2 rounded bg-canvas/60 p-2.5">

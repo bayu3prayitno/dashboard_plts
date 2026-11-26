@@ -36,10 +36,10 @@ class MqttSettings
     }
 
     /**
-     * Pola topik tetap (tidak bisa diubah dari menu): vpp/kampus/{kode_gateway}/node{node_id},
-     * mis. vpp/kampus/GW-3fa9c/node1. Kode gateway menentukan gateway, node{node_id} menentukan node.
+     * Pola topik tetap (tidak bisa diubah dari menu): vpp/{kode_gateway}/node{node_id},
+     * mis. vpp/GW-3fa9c/node1. Kode gateway menentukan gateway, node{node_id} menentukan node.
      */
-    public const TOPIC = 'vpp/kampus/+/+';
+    public const TOPIC = 'vpp/+/+';
 
     /**
      * Nilai efektif untuk subscriber: host, port, username, password (plain atau null), tls, client_id, topic.

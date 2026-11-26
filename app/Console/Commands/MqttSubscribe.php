@@ -172,14 +172,14 @@ class MqttSubscribe extends Command
 
     private function handleMessage(string $topic, string $message, TelemetryIngestor $ingestor, LegacyGatewayPayloadAdapter $adapter, GatewayStatusUpdater $statusUpdater): void
     {
-        // vpp/kampus/{kode_gateway}/{nama_node}: gateway dan node ditentukan dari topik
+        // vpp/{kode_gateway}/node{node_id}: gateway dan node ditentukan dari topik
         $segments = explode('/', $topic);
-        if (count($segments) !== 4 || $segments[2] === '' || $segments[3] === '') {
-            Log::warning('MQTT: topik harus berformat vpp/kampus/kode_gateway/nama_node', ['topic' => $topic]);
+        if (count($segments) !== 3 || $segments[1] === '' || $segments[2] === '') {
+            Log::warning('MQTT: topik harus berformat vpp/kode_gateway/node{node_id}', ['topic' => $topic]);
 
             return;
         }
-        [, , $gatewayCode, $topicNode] = $segments;
+        [, $gatewayCode, $topicNode] = $segments;
 
         $payload = json_decode($message, true);
         if (! is_array($payload)) {

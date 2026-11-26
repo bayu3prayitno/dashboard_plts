@@ -215,7 +215,7 @@ class DeviceController extends Controller
 
     /**
      * ID Node wajib unik di dalam satu gateway, tetapi boleh sama bila gatewaynya berbeda
-     * (topik MQTT vpp/kampus/{kode_gateway}/node{node_id} tetap berbeda).
+     * (topik MQTT vpp/{kode_gateway}/node{node_id} tetap berbeda).
      * Saat update, perangkat itu sendiri dikecualikan dari pengecekan.
      *
      * @return array<string, array<int, mixed>>

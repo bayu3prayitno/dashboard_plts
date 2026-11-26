@@ -47,7 +47,7 @@ class MqttTopicTest extends TestCase
         $gateway = $this->makeGateway('Gateway A');
         $device = $this->makeDevice($gateway, 4);
 
-        $this->assertSame("vpp/kampus/{$gateway->gateway_code}/node4", $device->mqttTopic());
+        $this->assertSame("vpp/{$gateway->gateway_code}/node4", $device->mqttTopic());
 
         // Topik yang ditampilkan dashboard diterima apa adanya oleh subscriber
         $this->receive($device->mqttTopic(), ['temp' => 30.5]);
@@ -74,7 +74,9 @@ class MqttTopicTest extends TestCase
         $gateway = $this->makeGateway('Gateway A');
         $this->makeDevice($gateway, 1);
 
-        $this->receive('vpp/kampus/GW-TIDAK-ADA/node1', ['temp' => 30.5]);
+        $this->receive('vpp/GW-TIDAK-ADA/node1', ['temp' => 30.5]);
+        // Format lama (dengan "kampus") tidak lagi diterima
+        $this->receive("vpp/kampus/{$gateway->gateway_code}/node1", ['temp' => 30.5]);
         $this->receive('vpp/kampus/node1', ['temp' => 30.5]);
 
         $this->assertSame(0, Measurement::count());

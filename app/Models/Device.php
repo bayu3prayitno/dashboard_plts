@@ -65,10 +65,10 @@ class Device extends Model
         return $this->belongsTo(Gateway::class);
     }
 
-    /** Topik MQTT perangkat ini: vpp/kampus/{kode_gateway}/{nama_perangkat}, mis. vpp/kampus/GW-3fa9c/bayu. */
+    /** Topik MQTT perangkat ini: vpp/{kode_gateway}/node{node_id}, mis. vpp/GW-3fa9c/node1. */
     public function mqttTopic(): string
     {
-        return 'vpp/kampus/'.$this->gateway->gateway_code.'/node'.$this->node_id;
+        return 'vpp/'.$this->gateway->gateway_code.'/node'.$this->node_id;
     }
 
     public function measurements(): HasMany

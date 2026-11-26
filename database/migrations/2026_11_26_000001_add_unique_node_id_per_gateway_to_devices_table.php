@@ -5,9 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * ID Node unik di dalam satu gateway, tetapi boleh sama di gateway berbeda.
- * Topik MQTT vpp/kampus/{kode_gateway}/node{node_id} hanya menunjuk satu perangkat bila pasangan ini unik.
- */
+ * Pastikan setiap node_id unik per gateway, agar topik MQTT tidak bentrok.
 return new class extends Migration
 {
     public function up(): void
