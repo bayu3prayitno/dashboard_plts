@@ -91,7 +91,7 @@ class DashboardController extends Controller
             'irradianceSpark' => $trend['avg']['irradiance']['24h'],
             'received' => $received,
             'links' => $links,
-            'gateway' => $this->gatewayRow(),
+            'gateways' => $this->gatewayRows(),
             'activeAlertCount' => Alert::open()->count(),
             'activeAlerts' => $this->activeAlerts(),
             'trendDevices' => $trend['devices'],
@@ -162,28 +162,37 @@ class DashboardController extends Controller
             ->keyBy('device_id');
     }
 
-    /** Gateway utama untuk kartu status. Dipakai nilai kosong bila belum ada gateway. */
-    private function gatewayRow(): array
+    /**
+     * Semua gateway untuk kartu status (gateway pertama tampil lebih dulu, sisanya lewat dropdown).
+     * Berisi satu baris kosong bila belum ada gateway.
+     *
+     * @return array<int, array{id: ?int, nama: string, status: string, mqtt_status: string, internet_status: string, last_seen: mixed}>
+     */
+    private function gatewayRows(): array
     {
-        $gateway = Gateway::query()->oldest('id')->first();
-
-        if (! $gateway) {
-            return [
-                'nama' => 'Belum ada gateway',
-                'status' => 'offline',
-                'mqtt_status' => 'disconnected',
-                'internet_status' => 'disconnected',
-                'last_seen' => null,
-            ];
-        }
-
-        return [
+        $rows = Gateway::query()->oldest('id')->get()->map(fn (Gateway $gateway) => [
+            'id' => $gateway->id,
             'nama' => $gateway->name,
             'status' => $gateway->status,
             'mqtt_status' => $gateway->mqtt_status,
             'internet_status' => $gateway->internet_status,
             'last_seen' => $gateway->last_seen_at,
-        ];
+        ])->all();
+
+        return $rows ?: [[
+            'id' => null,
+            'nama' => 'Belum ada gateway',
+            'status' => 'offline',
+            'mqtt_status' => 'disconnected',
+            'internet_status' => 'disconnected',
+            'last_seen' => null,
+        ]];
+    }
+
+    /** Gateway utama (pertama dibuat) untuk API polling. */
+    private function gatewayRow(): array
+    {
+        return $this->gatewayRows()[0];
     }
 
     /** Peringatan yang belum selesai, terbaru dulu. */

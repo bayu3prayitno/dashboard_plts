@@ -208,30 +208,64 @@
             </section>
 
             {{-- Status gateway --}}
-            <section class="rounded-3xl bg-primary p-5 text-white">
-                <div class="mb-4 flex items-center justify-between">
-                    <h2 class="text-base font-semibold">Status Gateway</h2>
-                    <a href="{{ route('gateway.index') }}" aria-label="Buka halaman gateway" class="grid size-8 place-items-center rounded-full bg-white/10 hover:bg-white/20">
-                        <x-icon name="arrow-up-right" :size="16" />
-                    </a>
+            <section data-gateway-card class="relative rounded-3xl bg-primary p-5 text-white">
+                <div class="mb-4 flex items-center justify-between gap-2">
+                    <h1 data-gateway-name class="truncate text-base font-semibold">{{ $gateways[0]['nama'] }}</h1>
+                    @if (count($gateways) > 1)
+                        {{-- Lebih dari satu gateway: panah bawah membuka daftar gateway lain --}}
+                        <button type="button" data-gateway-toggle aria-haspopup="listbox" aria-expanded="false" aria-controls="gateway-menu" aria-label="Pilih gateway lain"
+                            class="grid size-8 shrink-0 place-items-center rounded-full bg-white/10 hover:bg-white/20 [&>svg]:transition-transform [&>svg]:duration-200 aria-expanded:[&>svg]:rotate-180 motion-reduce:[&>svg]:transition-none">
+                            <x-icon name="chevron-down" :size="16" />
+                        </button>
+                    @else
+                        <a href="{{ route('gateway.index') }}" aria-label="Buka halaman gateway" class="grid size-8 shrink-0 place-items-center rounded-full bg-white/10 hover:bg-white/20">
+                            <x-icon name="arrow-up-right" :size="16" />
+                        </a>
+                    @endif
                 </div>
-                <p class="text-sm text-white/60">{{ $gateway['nama'] }}</p>
-                <p class="mt-1 flex items-center gap-2 text-3xl font-semibold">
-                    <span class="size-2.5 rounded-full {{ $gateway['status'] === 'online' ? 'bg-lime' : 'bg-red-400' }}"></span>
-                    {{ $gateway['status'] === 'online' ? 'Online' : 'Offline' }}
-                </p>
-                <ul class="mt-4 space-y-2 text-sm">
-                    @foreach ([
-                        ['server', 'Broker MQTT', $gateway['mqtt_status'] === 'connected' ? 'Terhubung' : 'Terputus'],
-                        ['globe', 'Koneksi Server', $gateway['internet_status'] === 'connected' ? 'Terhubung' : 'Terputus'],
-                        ['radio', 'Data Terakhir', Format::relTime($gateway['last_seen'])],
-                    ] as [$icon, $label, $value])
-                        <li class="flex items-center justify-between gap-2">
-                            <span class="flex items-center gap-2 text-white/60"><x-icon :name="$icon" :size="15" /> {{ $label }}</span>
-                            <span class="font-medium">{{ $value }}</span>
-                        </li>
-                    @endforeach
-                </ul>
+
+                @if (count($gateways) > 1)
+                    <div id="gateway-menu" data-gateway-menu data-state="closed" role="listbox" aria-label="Daftar gateway"
+                        class="absolute top-14 right-5 z-20 w-60 origin-top-right rounded-2xl bg-white p-1.5 text-ink shadow-xl ring-1 ring-black/5
+                               transition-all transition-discrete duration-150 ease-out motion-reduce:transition-none
+                               opacity-100 scale-100 translate-y-0 starting:opacity-0 starting:scale-95 starting:-translate-y-1
+                               data-[state=closed]:hidden data-[state=closed]:opacity-0 data-[state=closed]:scale-95 data-[state=closed]:-translate-y-1">
+                        @foreach ($gateways as $i => $gw)
+                            <button type="button" role="option" data-gateway-option="{{ $i }}" data-gateway-id="{{ $gw['id'] }}" data-name="{{ $gw['nama'] }}"
+                                aria-selected="{{ $loop->first ? 'true' : 'false' }}"
+                                class="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-canvas aria-selected:font-semibold">
+                                <span class="size-2 shrink-0 rounded-full {{ $gw['internet_status'] === 'connected' ? 'bg-lime' : 'bg-red-400' }}"></span>
+                                <span class="min-w-0 flex-1 truncate">{{ $gw['nama'] }}</span>
+                                <span class="invisible text-primary group-aria-selected:visible"><x-icon name="check" :size="15" /></span>
+                            </button>
+                        @endforeach
+                        <a href="{{ route('gateway.index') }}" class="mt-1 flex items-center justify-between gap-2 rounded-xl border-t border-line px-3 py-2 text-sm text-muted hover:bg-canvas hover:text-ink">
+                            Kelola gateway <x-icon name="arrow-up-right" :size="14" />
+                        </a>
+                    </div>
+                @endif
+
+                @foreach ($gateways as $i => $gw)
+                    <div data-gateway-panel="{{ $i }}" @unless ($loop->first) hidden @endunless>
+                        <p class="text-sm text-white/60">Status gateway</p>
+                        <p class="mt-1 flex items-center gap-2 text-3xl font-semibold">
+                            {{-- Online bila ada paket dari node mana pun dalam Offline Timeout (lihat Gateway::internetStatus) --}}
+                            <span class="size-2.5 rounded-full {{ $gw['internet_status'] === 'connected' ? 'bg-lime' : 'bg-red-400' }}"></span>
+                            {{ $gw['internet_status'] === 'connected' ? 'Online' : 'Offline' }}
+                        </p>
+                        <ul class="mt-4 space-y-2 text-sm">
+                            @foreach ([
+                                ['server', 'Broker MQTT', $gw['mqtt_status'] === 'connected' ? 'Terhubung' : 'Terputus'],
+                                ['radio', 'Data Terakhir', Format::relTime($gw['last_seen'])],
+                            ] as [$icon, $label, $value])
+                                <li class="flex items-center justify-between gap-2">
+                                    <span class="flex items-center gap-2 text-white/60"><x-icon :name="$icon" :size="15" /> {{ $label }}</span>
+                                    <span class="font-medium">{{ $value }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endforeach
             </section>
 
             {{-- Peringatan terbaru --}}
@@ -283,6 +317,62 @@
 
 @push('scripts')
 <script>
+// Kartu status gateway: dropdown untuk berpindah antar gateway (hanya ada bila gateway > 1)
+(function () {
+    const card = document.querySelector('[data-gateway-card]');
+    const toggle = card?.querySelector('[data-gateway-toggle]');
+    if (!toggle) return;
+
+    const menu = card.querySelector('[data-gateway-menu]');
+    const nameEl = card.querySelector('[data-gateway-name]');
+    const options = [...menu.querySelectorAll('[data-gateway-option]')];
+    const panels = [...card.querySelectorAll('[data-gateway-panel]')];
+    const STORE_KEY = 'dashboard.gateway';
+
+    const isOpen = () => menu.dataset.state === 'open';
+    const setOpen = (open) => {
+        menu.dataset.state = open ? 'open' : 'closed';
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+
+    const select = (index, remember = true) => {
+        const option = options[index];
+        if (!option) return;
+        options.forEach((o, i) => o.setAttribute('aria-selected', i === index ? 'true' : 'false'));
+        panels.forEach((p) => { p.hidden = p.dataset.gatewayPanel !== String(index); });
+        nameEl.textContent = option.dataset.name;
+        if (remember) {
+            try { localStorage.setItem(STORE_KEY, option.dataset.gatewayId); } catch (e) {}
+        }
+    };
+
+    // Pulihkan gateway yang terakhir dipilih
+    try {
+        const saved = localStorage.getItem(STORE_KEY);
+        const index = options.findIndex((o) => o.dataset.gatewayId === saved);
+        if (index > 0) select(index, false);
+    } catch (e) {}
+
+    toggle.addEventListener('click', () => {
+        setOpen(!isOpen());
+        if (isOpen()) (options.find((o) => o.getAttribute('aria-selected') === 'true') ?? options[0]).focus();
+    });
+    options.forEach((o, i) => o.addEventListener('click', () => {
+        select(i);
+        setOpen(false);
+        toggle.focus();
+    }));
+    document.addEventListener('click', (e) => {
+        if (isOpen() && !menu.contains(e.target) && !toggle.contains(e.target)) setOpen(false);
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isOpen()) {
+            setOpen(false);
+            toggle.focus();
+        }
+    });
+})();
+
 (function () {
     const TRENDS = @json($trendDevices);
     const SENSORS = @json($sensors);

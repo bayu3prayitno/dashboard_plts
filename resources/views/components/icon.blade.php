@@ -18,6 +18,7 @@
         'download' =>'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
         'log-out' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
         'menu' => '<path d="M4 12h16M4 6h16M4 18h16"/>',
+        'chevron-down' => '<path d="m6 9 6 6 6-6"/>',
         'search' => '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
         'arrow-up-right' => '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
         'plus' => '<path d="M5 12h14M12 5v14"/>',
