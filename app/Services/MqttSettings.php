@@ -21,8 +21,19 @@ class MqttSettings
         'mqtt_tls' => ['default' => '0', 'description' => 'Gunakan TLS ke broker (1 = ya, 0 = tidak)'],
     ];
 
-    /** ID klien dasar; ditambah PID saat koneksi. */
+    /** Awalan ID klien; lihat clientId() untuk ID lengkapnya. */
     public const CLIENT_ID = 'omahiot-subscriber';
+
+    /**
+     * ID klien unik per instalasi: awalan + potongan hash APP_KEY, mis. omahiot-subscriber-3fa9c0d1e2.
+     * Di broker publik (broker.emqx.io) ID tetap "omahiot-subscriber" bisa dipakai juga oleh instalasi lain;
+     * broker lalu memutus salah satu klien setiap kali yang lain connect (saling tendang).
+     * ID tetap sama antar-restart agar sesi persisten (QoS 1) tetap berlaku.
+     */
+    public static function clientId(): string
+    {
+        return self::CLIENT_ID.'-'.substr(hash('sha256', (string) config('app.key')), 0, 10);
+    }
 
     /**
      * Pola topik tetap (tidak bisa diubah dari menu): vpp/kampus/{kode_gateway}/node{node_id},
@@ -45,7 +56,7 @@ class MqttSettings
             'username' => $stored['mqtt_username'] !== '' ? $stored['mqtt_username'] : null,
             'password' => self::plainPassword($stored['mqtt_password']),
             'tls' => $stored['mqtt_tls'] === '1',
-            'client_id' => self::CLIENT_ID,
+            'client_id' => self::clientId(),
             'topic' => self::TOPIC,
         ];
     }
