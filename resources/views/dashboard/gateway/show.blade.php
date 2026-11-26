@@ -34,7 +34,7 @@
         <section class="card">
             <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="globe" :size="16" /> Koneksi Server</div>
             <div class="mt-3"><x-status-badge :status="$gateway->internet_status" /></div>
-            <p class="mt-2 text-xs text-muted">Pesan dari gateway diterima server dalam 15 menit terakhir</p>
+            <p class="mt-2 text-xs text-muted">Ada paket dari node mana pun dalam {{ \App\Models\Gateway::connectionTimeoutMinutes() }} menit terakhir (Offline Timeout)</p>
         </section>
         <section class="card">
             <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="clock" :size="16" /> Komunikasi terakhir</div>

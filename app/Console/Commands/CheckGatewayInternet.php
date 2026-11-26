@@ -18,7 +18,7 @@ class CheckGatewayInternet extends Command
             ->where('internet_status', 'connected')
             ->where(function ($query) {
                 $query->whereNull('internet_last_seen_at')
-                    ->orWhere('internet_last_seen_at', '<', now()->subMinutes(Gateway::INTERNET_TIMEOUT_MINUTES));
+                    ->orWhere('internet_last_seen_at', '<', now()->subMinutes(Gateway::connectionTimeoutMinutes()));
             })
             ->update(['internet_status' => 'disconnected']);
 

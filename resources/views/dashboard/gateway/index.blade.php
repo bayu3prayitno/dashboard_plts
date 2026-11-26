@@ -32,11 +32,11 @@
         </div>
         <div class="card">
             <p class="text-muted text-sm">Gateway Online</p>
-            <p class="text-3xl font-bold text-lime-dark">{{ $gateways->where('status', 'online')->count() }}</p>
+            <p class="text-3xl font-bold text-lime-dark">{{ $gateways->where('internet_status', 'connected')->count() }}</p>
         </div>
         <div class="card">
             <p class="text-muted text-sm">Gateway Offline</p>
-            <p class="text-3xl font-bold text-red-600">{{ $gateways->where('status', 'offline')->count() }}</p>
+            <p class="text-3xl font-bold text-red-600">{{ $gateways->where('internet_status', 'disconnected')->count() }}</p>
         </div>
         <div class="card">
             <p class="text-muted text-sm">Total Node</p>
@@ -51,8 +51,6 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Nama Gateway</th>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Kode</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Status Koneksi</th>
-                    <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Broker MQTT</th>
                     <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Koneksi Server</th>
                     <th class="px-6 py-3 text-center text-sm font-semibold text-ink">Jumlah Node</th>
                     <th class="px-6 py-3 text-left text-sm font-semibold text-ink">Komunikasi Terakhir</th>
@@ -64,8 +62,6 @@
                 <tr class="hover:bg-canvas/60">
                     <td class="px-6 py-4 text-sm font-semibold text-ink">{{ $gateway->name }}</td>
                     <td class="px-6 py-4 text-sm font-mono text-muted">{{ $gateway->gateway_code }}</td>
-                    <td class="px-6 py-4 text-center"><x-status-badge :status="$gateway->status" /></td>
-                    <td class="px-6 py-4 text-center"><x-status-badge :status="$gateway->mqtt_status" /></td>
                     <td class="px-6 py-4 text-center"><x-status-badge :status="$gateway->internet_status" /></td>
                     <td class="px-6 py-4 text-center text-sm font-semibold text-ink">{{ $gateway->devices_count }}</td>
                     <td class="px-6 py-4 text-sm text-muted">{{ Format::relTime($gateway->last_seen_at) }}</td>
@@ -75,7 +71,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-4 text-center text-sm text-muted">Belum ada gateway terdaftar.</td>
+                    <td colspan="6" class="px-6 py-4 text-center text-sm text-muted">Belum ada gateway terdaftar.</td>
                 </tr>
                 @endforelse
             </tbody>

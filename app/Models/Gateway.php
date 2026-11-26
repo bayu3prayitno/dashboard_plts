@@ -12,8 +12,15 @@ use Illuminate\Support\Facades\Cache;
 #[Fillable(['name', 'status', 'mqtt_status', 'internet_status', 'last_seen_at', 'internet_last_seen_at'])]
 class Gateway extends Model
 {
-    /** Internet dianggap putus bila tidak ada pesan dari gateway dalam kurun ini (siklus node 5 menit). */
-    public const INTERNET_TIMEOUT_MINUTES = 15;
+    /**
+     * Gateway dianggap terputus bila tidak ada paket sama sekali (dari node mana pun) melebihi
+     * Offline Timeout (pengaturan offline_timeout_minutes). Satu paket dari node mana saja cukup
+     * untuk menjaganya tetap terhubung.
+     */
+    public static function connectionTimeoutMinutes(): int
+    {
+        return Device::offlineTimeoutMinutes();
+    }
 
     /** Kunci cache tempat subscriber (mqtt:subscribe) menyimpan waktu heartbeat terakhir. */
     public const MQTT_HEARTBEAT_KEY = 'mqtt:subscriber:heartbeat';
@@ -39,8 +46,8 @@ class Gateway extends Model
     }
 
     /**
-     * Status internet dihitung dari pesan terakhir gateway yang diterima server.
-     * Terhubung bila pesan terakhir masih dalam INTERNET_TIMEOUT_MINUTES.
+     * Status koneksi dihitung dari paket terakhir (node mana pun) yang diterima server dari gateway ini.
+     * Terhubung bila paket terakhir masih dalam Offline Timeout.
      */
     protected function internetStatus(): Attribute
     {
@@ -49,7 +56,7 @@ class Gateway extends Model
                 return 'disconnected';
             }
 
-            return $this->internet_last_seen_at->gte(now()->subMinutes(self::INTERNET_TIMEOUT_MINUTES))
+            return $this->internet_last_seen_at->gte(now()->subMinutes(self::connectionTimeoutMinutes()))
                 ? 'connected'
                 : 'disconnected';
         });
