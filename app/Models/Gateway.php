@@ -74,11 +74,10 @@ class Gateway extends Model
 
     protected static function booted(): void
     {
-        // Kode gateway dibuat otomatis dengan 128 bit entropi acak kriptografis
-        // dan tidak dapat ditebak dari urutan atau ID database.
+        // Buat kode unik untuk setiap gateway baru (hex 5 digit).
         static::creating(function (Gateway $gateway) {
             do {
-                $gateway->gateway_code = 'GW-'.bin2hex(random_bytes(7));
+                $gateway->gateway_code = sprintf('GW-%05x', random_int(0, 0xFFFFF));
             } while (self::where('gateway_code', $gateway->gateway_code)->exists());
         });
     }
