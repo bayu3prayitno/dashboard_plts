@@ -15,16 +15,17 @@ class GatewayStatusUpdater
     /** Dipanggil setiap pesan dari gateway diterima subscriber. @return bool true bila gateway dikenal */
     public function markInternetConnected(string $gatewayCode): bool
     {
-        $updated = Gateway::where('gateway_code', $gatewayCode)->update([
-            'internet_status' => 'connected',
-            'internet_last_seen_at' => now(),
-        ]);
-
-        if ($updated === 0) {
+        // Cek apakah gateway dikenal
+        if (! Gateway::where('gateway_code', $gatewayCode)->exists()) {
             Log::warning('MQTT: pesan dari gateway tidak dikenal', ['gateway' => $gatewayCode]);
 
             return false;
         }
+
+        Gateway::where('gateway_code', $gatewayCode)->update([
+            'internet_status' => 'connected',
+            'internet_last_seen_at' => now(),
+        ]);
 
         return true;
     }
