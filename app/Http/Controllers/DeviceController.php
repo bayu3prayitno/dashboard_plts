@@ -30,17 +30,20 @@ class DeviceController extends Controller
         }
 
         // Filter berdasarkan status (online/offline/inactive)
+        // Sama dengan Device::status(): tiap node dinilai dari paket terakhirnya sendiri terhadap Offline Timeout
         if ($status = $request->input('status')) {
+            $cutoff = now()->subMinutes(Device::offlineTimeoutMinutes());
+
             if ($status === 'online') {
-                // Online: is_active=true dan last_seen_at masih dalam timeout (~5 menit)
+                // Online: is_active=true dan paket terakhir node masih dalam Offline Timeout
                 $query->where('is_active', true)
-                      ->where('last_seen_at', '>=', now()->subMinutes(5));
+                      ->where('last_seen_at', '>=', $cutoff);
             } elseif ($status === 'offline') {
-                // Offline: is_active=true tapi last_seen_at sudah lama atau null
+                // Offline: is_active=true tapi belum pernah kirim paket atau paket terakhir melebihi Offline Timeout
                 $query->where('is_active', true)
-                      ->where(function ($q) {
+                      ->where(function ($q) use ($cutoff) {
                           $q->whereNull('last_seen_at')
-                            ->orWhere('last_seen_at', '<', now()->subMinutes(5));
+                            ->orWhere('last_seen_at', '<', $cutoff);
                       });
             } elseif ($status === 'inactive') {
                 // Inactive: is_active=false
