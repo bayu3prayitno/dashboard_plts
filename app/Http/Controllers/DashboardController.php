@@ -10,6 +10,7 @@ use App\Support\SettingsCache;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -84,8 +85,15 @@ class DashboardController extends Controller
         $powerPeak = max(array_map(fn ($p) => $p['value'] ?? 0, $trend['avg']['power']['24h']));
         $powerShare = $powerNow !== null && $powerPeak > 0 ? min(100, $powerNow / $powerPeak * 100) : 0;
 
-        $links = array_values(array_filter($devices, fn ($d) => $d['aktif'] && $d['packet_loss'] !== null));
-        $received = $this->average(array_map(fn ($d) => 100 - $d['packet_loss'], $links));
+        // Paket diterima per node (24 jam terakhir) + kualitas sinyal LoRa dari paket terakhir
+        $linkStats = $this->linkStats(array_column($devices, 'id'));
+        foreach ($devices as &$d) {
+            $d['link'] = $linkStats[$d['id']];
+        }
+        unset($d);
+
+        $links = array_values(array_filter($devices, fn ($d) => $d['aktif'] && $d['link']['percent'] !== null));
+        $received = $this->average(array_map(fn ($d) => $d['link']['percent'], $links));
 
         return view('dashboard.index', [
             'devices' => $devices,
@@ -125,8 +133,93 @@ class DashboardController extends Controller
             'status' => $device->status($offlineMinutes),
             'last_seen' => $device->last_seen_at,
             'packet_loss' => $m?->packet_loss !== null ? (float) $m->packet_loss : null,
+            'rssi' => $m?->rssi !== null ? (int) $m->rssi : null,
+            'snr' => $m?->snr !== null ? (float) $m->snr : null,
+            'quality' => self::linkQuality($m?->rssi !== null ? (int) $m->rssi : null, $m?->snr !== null ? (float) $m->snr : null),
             'latest' => $latest,
         ];
+    }
+
+    /**
+     * Kualitas sinyal LoRa dari paket terakhir: diambil yang terburuk antara RSSI dan SNR.
+     * RSSI: > -100 dBm baik, -100..-115 sedang, < -115 lemah.
+     * SNR : >= 0 dB baik, -10..0 sedang, < -10 lemah (mendekati batas demodulasi LoRa).
+     */
+    public static function linkQuality(?int $rssi, ?float $snr): ?string
+    {
+        if ($rssi === null && $snr === null) {
+            return null;
+        }
+
+        $levels = ['baik' => 0, 'sedang' => 1, 'lemah' => 2];
+        $byRssi = $rssi === null ? 'baik' : ($rssi > -100 ? 'baik' : ($rssi >= -115 ? 'sedang' : 'lemah'));
+        $bySnr = $snr === null ? 'baik' : ($snr >= 0 ? 'baik' : ($snr >= -10 ? 'sedang' : 'lemah'));
+
+        return $levels[$byRssi] >= $levels[$bySnr] ? $byRssi : $bySnr;
+    }
+
+    /** Rentang hitung paket diterima. */
+    private const LINK_WINDOW_HOURS = 24;
+
+    /**
+     * Paket diterima tiap node dalam 24 jam terakhir dibanding paket yang seharusnya masuk
+     * (satu paket per interval beacon). Firmware tidak mengirim packet loss, jadi dihitung di server.
+     * Node yang baru mulai mengirim di dalam rentang dihitung sejak paket pertamanya.
+     *
+     * @param  array<int>  $deviceIds
+     * @return array<int, array{received: int, expected: int, percent: ?float}>
+     */
+    private function linkStats(array $deviceIds): array
+    {
+        $empty = ['received' => 0, 'expected' => 0, 'percent' => null];
+        if ($deviceIds === []) {
+            return [];
+        }
+
+        $interval = max(1, (int) SettingsCache::get('beacon_interval_minutes', '5'));
+        $now = now();
+        $windowStart = $now->copy()->subHours(self::LINK_WINDOW_HOURS);
+
+        $inWindow = DB::table('measurements')
+            ->whereIn('device_id', $deviceIds)
+            ->where('recorded_at', '>=', $windowStart)
+            ->selectRaw('device_id, COUNT(*) AS received, MIN(recorded_at) AS first_at')
+            ->groupBy('device_id')
+            ->get()
+            ->keyBy('device_id');
+
+        // Node yang sudah mengirim sebelum rentang: harapan dihitung penuh 24 jam
+        $olderIds = DB::table('measurements')
+            ->whereIn('device_id', $deviceIds)
+            ->where('recorded_at', '<', $windowStart)
+            ->distinct()
+            ->pluck('device_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $stats = [];
+        foreach ($deviceIds as $id) {
+            $row = $inWindow->get($id);
+            $hasOlder = in_array($id, $olderIds, true);
+
+            if (! $row && ! $hasOlder) {
+                $stats[$id] = $empty; // belum pernah mengirim data
+
+                continue;
+            }
+
+            $start = $hasOlder ? $windowStart : Carbon::parse($row->first_at);
+            $expected = intdiv((int) $start->diffInMinutes($now, true), $interval) + 1;
+            $received = (int) ($row->received ?? 0);
+
+            $stats[$id] = [
+                'received' => $received,
+                'expected' => $expected,
+                'percent' => min(100, $received / $expected * 100),
+            ];
+        }
+
+        return $stats;
     }
 
     /** Pengukuran terakhir tiap perangkat, dikunci dengan device_id. */

@@ -10,6 +10,10 @@
         'selesai' => ['Selesai', 'bg-emerald-50 text-emerald-700', 'bg-emerald-500'],
         'connected' => ['Terhubung', 'bg-emerald-50 text-emerald-700', 'bg-emerald-500'],
         'disconnected' => ['Terputus', 'bg-red-50 text-red-700', 'bg-red-500'],
+        // Kualitas sinyal LoRa (DashboardController::linkQuality)
+        'baik' => ['Baik', 'bg-emerald-50 text-emerald-700', 'bg-emerald-500'],
+        'sedang' => ['Sedang', 'bg-amber-50 text-amber-800', 'bg-amber-500'],
+        'lemah' => ['Lemah', 'bg-red-50 text-red-700', 'bg-red-500'],
     ];
     [$label, $tone, $dot] = $map[$status] ?? $map['nonaktif'];
 @endphp

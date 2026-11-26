@@ -197,14 +197,7 @@
                     <text x="100" y="88" text-anchor="middle" class="fill-ink text-[34px] font-semibold">{{ $received === null ? '—' : round($received).'%' }}</text>
                     <text x="100" y="108" text-anchor="middle" class="fill-muted text-[11px]">paket diterima</text>
                 </svg>
-                <ul class="mt-3 space-y-1.5 text-xs">
-                    @foreach ($links as $d)
-                        <li class="flex justify-between gap-2">
-                            <span class="truncate text-muted">{{ $d['nama'] }}</span>
-                            <span class="font-medium tabular-nums">{{ Format::num(100 - $d['packet_loss'], 1) }}%</span>
-                        </li>
-                    @endforeach
-                </ul>
+                <p class="mt-2 text-center text-xs text-muted">Rata-rata node aktif, 24 jam terakhir</p>
             </section>
 
             {{-- Status gateway --}}
@@ -290,19 +283,47 @@
             {{-- Perangkat --}}
             <section class="card sm:col-span-2">
                 <div class="mb-4 flex items-center justify-between gap-3">
-                    <h2 class="text-base font-semibold">Perangkat</h2>
+                    <div>
+                        <h2 class="text-base font-semibold">Kualitas LoRa per Node</h2>
+                        <p class="mt-0.5 text-xs text-muted">Sinyal dari paket terakhir · paket diterima 24 jam terakhir</p>
+                    </div>
                     <a href="{{ route('devices.index') }}" class="rounded-full border border-line px-3 py-1 text-xs font-medium hover:bg-canvas">Kelola</a>
                 </div>
+                @if ($devices === [])
+                    <p class="py-6 text-center text-sm text-muted">Belum ada node di gateway ini.</p>
+                @endif
                 <ul class="space-y-1">
                     @foreach ($devices as $d)
+                        @php $link = $d['link']; @endphp
                         <li>
                             <a href="{{ route('devices.show', $d['id']) }}" class="flex items-center gap-3 rounded-2xl p-2 hover:bg-canvas">
                                 <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-sm font-semibold">{{ $d['node_id'] }}</span>
                                 <span class="min-w-0 flex-1">
-                                    <span class="block truncate text-sm font-medium">{{ $d['nama'] }}</span>
-                                    <span class="block truncate text-xs text-muted">{{ $d['lokasi'] }} · {{ Format::relTime($d['last_seen']) }}</span>
+                                    <span class="flex items-center gap-2">
+                                        <span class="truncate text-sm font-medium">{{ $d['nama'] }}</span>
+                                        @if ($d['quality'])
+                                            <x-status-badge :status="$d['quality']" class="py-0.5" />
+                                        @endif
+                                    </span>
+                                    <span class="block truncate text-xs text-muted tabular-nums">
+                                        @if ($d['rssi'] !== null || $d['snr'] !== null)
+                                            RSSI {{ $d['rssi'] ?? '—' }} dBm · SNR {{ Format::num($d['snr'], 1) }} dB
+                                        @else
+                                            Belum ada data sinyal
+                                        @endif
+                                    </span>
                                 </span>
-                                <x-status-badge :status="$d['status']" />
+                                <span class="w-24 shrink-0 text-right">
+                                    @if ($link['percent'] !== null)
+                                        <span class="block text-sm font-semibold tabular-nums">{{ Format::num($link['percent'], 0) }}%</span>
+                                        <span class="block text-[11px] text-muted tabular-nums" title="Paket diterima / seharusnya (1 paket per interval beacon)">{{ $link['received'] }}/{{ $link['expected'] }} paket</span>
+                                        <span class="mt-1 block h-1.5 overflow-hidden rounded-full bg-line">
+                                            <span class="block h-full rounded-full {{ $link['percent'] >= 90 ? 'bg-lime' : ($link['percent'] >= 70 ? 'bg-amber-400' : 'bg-red-400') }}" style="width: {{ $link['percent'] }}%"></span>
+                                        </span>
+                                    @else
+                                        <span class="text-xs text-muted">—</span>
+                                    @endif
+                                </span>
                             </a>
                         </li>
                     @endforeach
