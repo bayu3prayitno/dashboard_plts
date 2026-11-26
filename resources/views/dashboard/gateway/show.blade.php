@@ -60,6 +60,16 @@
                     <dt class="shrink-0 text-muted">Kode Gateway</dt>
                     <dd class="text-right font-medium break-all">{{ $gateway->gateway_code }}</dd>
                 </div>
+                @php($topicPrefix = 'vpp/kampus/'.$gateway->gateway_code.'/')
+                <div>
+                    <dt class="text-muted">Topic MQTT</dt>
+                    <dd class="mt-1.5 flex items-center gap-2 rounded bg-canvas/60 p-2.5">
+                        <span class="flex-1 font-mono text-xs break-all">{{ $topicPrefix }}<span class="text-muted">node{node_id}</span></span>
+                        <button type="button" onclick="copyTopicPrefix(@js($topicPrefix))" class="shrink-0 rounded p-1 text-muted hover:bg-white hover:text-primary" title="Salin {{ $topicPrefix }}" aria-label="Salin topic MQTT">
+                            <x-icon name="copy" :size="15" />
+                        </button>
+                    </dd>
+                </div>
             </dl>
         </section>
 
@@ -99,5 +109,13 @@
             </div>
         </section>
     </div>
+
+<script>
+function copyTopicPrefix(text) {
+    navigator.clipboard.writeText(text)
+        .then(() => showToast('Topic disalin: ' + text, 'success'))
+        .catch(() => showToast('Gagal menyalin. Salin secara manual.', 'error'));
+}
+</script>
 @endsection
 
