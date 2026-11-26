@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Pastikan setiap node_id unik per gateway, agar topik MQTT tidak bentrok.
+ */
 return new class extends Migration
 {
     public function up(): void
