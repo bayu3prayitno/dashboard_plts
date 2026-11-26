@@ -107,7 +107,8 @@
 
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
         {{-- ================= KOLOM KIRI ================= --}}
-        <div class="min-w-0 space-y-4 xl:col-span-7">
+        {{-- Kartu terakhir tiap kolom (flex-1 / baris 1fr) mengisi sisa tinggi, agar bawah kedua kolom selalu sejajar --}}
+        <div class="flex min-w-0 flex-col gap-4 xl:col-span-7">
             <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
                 @foreach ($tiles as $t)
                     <a href="{{ route($t['route']) }}" class="flex items-center gap-3 rounded-3xl bg-white p-4 transition-shadow hover:shadow-md">
@@ -147,7 +148,7 @@
             </section>
 
             {{-- Nilai sensor terkini per node --}}
-            <section class="card">
+            <section class="card xl:flex-1">
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h2 class="text-base font-semibold">Nilai Sensor Terkini per Node</h2>
                 </div>
@@ -183,11 +184,14 @@
         </div>
 
         {{-- ================= KOLOM KANAN ================= --}}
-        <div class="grid min-w-0 grid-cols-1 content-start gap-4 sm:grid-cols-2 xl:col-span-5">
+        <div class="grid min-w-0 grid-cols-1 content-start gap-4 sm:grid-cols-2 xl:col-span-5 xl:grid-rows-[auto_auto_1fr] xl:content-stretch">
             {{-- Kualitas link LoRa --}}
             <section class="card">
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h2 class="text-base font-semibold">Kualitas Link LoRa</h2>
+                    @if ($worstQuality)
+                        <x-status-badge :status="$worstQuality" title="Sinyal terburuk di antara node aktif (RSSI/SNR paket terakhir)" />
+                    @endif
                 </div>
                 <svg viewBox="0 0 200 116" class="mx-auto w-full max-w-64" role="img" aria-label="paket diterima: {{ $received === null ? 'tidak ada data' : round($received).'%' }}">
                     <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#e7eae8" stroke-width="20" stroke-linecap="round" />

@@ -95,6 +95,11 @@ class DashboardController extends Controller
         $links = array_values(array_filter($devices, fn ($d) => $d['aktif'] && $d['link']['percent'] !== null));
         $received = $this->average(array_map(fn ($d) => $d['link']['percent'], $links));
 
+        // Kualitas sinyal terburuk di antara node aktif: satu node bermasalah sudah perlu diperhatikan
+        $qualities = array_filter(array_map(fn ($d) => $d['aktif'] ? $d['quality'] : null, $devices));
+        $worstQuality = $qualities === [] ? null
+            : self::LINK_LEVELS[max(array_map(fn ($q) => array_search($q, self::LINK_LEVELS, true), $qualities))];
+
         return view('dashboard.index', [
             'devices' => $devices,
             'onlineCount' => count($online),
@@ -105,6 +110,7 @@ class DashboardController extends Controller
             'irradianceNow' => $avg('irradiance'),
             'irradianceSpark' => $trend['avg']['irradiance']['24h'],
             'received' => $received,
+            'worstQuality' => $worstQuality,
             'links' => $links,
             'gateways' => $gateways,
             'gateway' => $selected,
@@ -140,10 +146,13 @@ class DashboardController extends Controller
         ];
     }
 
+    /** Level kualitas sinyal LoRa, dari terbaik ke terburuk. */
+    public const LINK_LEVELS = ['sangat_baik', 'baik', 'cukup', 'buruk', 'kritis'];
+
     /**
      * Kualitas sinyal LoRa dari paket terakhir: diambil yang terburuk antara RSSI dan SNR.
-     * RSSI: > -100 dBm baik, -100..-115 sedang, < -115 lemah.
-     * SNR : >= 0 dB baik, -10..0 sedang, < -10 lemah (mendekati batas demodulasi LoRa).
+     * Ambang mengikuti HSLU LoRa Field Testing Guideline
+     * (https://hslu-ige-laes.github.io/lora-devices-ttn/docs/field_testing_guideline):
      */
     public static function linkQuality(?int $rssi, ?float $snr): ?string
     {
@@ -151,11 +160,22 @@ class DashboardController extends Controller
             return null;
         }
 
-        $levels = ['baik' => 0, 'sedang' => 1, 'lemah' => 2];
-        $byRssi = $rssi === null ? 'baik' : ($rssi > -100 ? 'baik' : ($rssi >= -115 ? 'sedang' : 'lemah'));
-        $bySnr = $snr === null ? 'baik' : ($snr >= 0 ? 'baik' : ($snr >= -10 ? 'sedang' : 'lemah'));
+        $byRssi = $rssi === null ? 0 : match (true) {
+            $rssi > -90 => 0,
+            $rssi >= -100 => 1,
+            $rssi >= -115 => 2,
+            $rssi >= -125 => 3,
+            default => 4,
+        };
+        $bySnr = $snr === null ? 0 : match (true) {
+            $snr > 5 => 0,
+            $snr >= 0 => 1,
+            $snr >= -7 => 2,
+            $snr >= -15 => 3,
+            default => 4,
+        };
 
-        return $levels[$byRssi] >= $levels[$bySnr] ? $byRssi : $bySnr;
+        return self::LINK_LEVELS[max($byRssi, $bySnr)];
     }
 
     /** Rentang hitung paket diterima. */
