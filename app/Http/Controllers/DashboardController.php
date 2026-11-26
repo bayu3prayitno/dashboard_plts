@@ -8,6 +8,8 @@ use App\Models\Gateway;
 use App\Models\Setting;
 use App\Support\SettingsCache;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -46,15 +48,20 @@ class DashboardController extends Controller
         Alert::STATUS_RESOLVED => 'selesai',
     ];
 
-    public function index(): View
+    /** Kunci session gateway yang dipilih di dashboard. */
+    private const SESSION_GATEWAY = 'dashboard.gateway_id';
+
+    public function index(Request $request): View
     {
         $now = CarbonImmutable::now(self::tz());
         $offlineMinutes = Device::offlineTimeoutMinutes();
 
+        // Semua isi dashboard (node, ringkasan, tren, peringatan) hanya dari gateway yang dipilih
+        $gateways = $this->gatewayRows();
+        $selected = $this->selectedGateway($request, $gateways);
+
         $latest = $this->latestMeasurements();
-        $devices = Device::query()
-            ->orderBy('node_id')
-            ->get()
+        $devices = $this->gatewayDevices($selected['id'])
             ->map(fn (Device $device) => $this->deviceRow($device, $latest->get($device->id), $offlineMinutes))
             ->all();
 
@@ -69,7 +76,7 @@ class DashboardController extends Controller
             }
         }
 
-        $trend = Cache::remember('dashboard_trend_' . $now->format('Y-m-d-H'), 300,
+        $trend = Cache::remember('dashboard_trend_'.($selected['id'] ?? 0).'_'.$now->format('Y-m-d-H'), 300,
             fn () => $this->trend($activeDevices, $now)
         );
 
@@ -91,9 +98,10 @@ class DashboardController extends Controller
             'irradianceSpark' => $trend['avg']['irradiance']['24h'],
             'received' => $received,
             'links' => $links,
-            'gateways' => $this->gatewayRows(),
-            'activeAlertCount' => Alert::open()->count(),
-            'activeAlerts' => $this->activeAlerts(),
+            'gateways' => $gateways,
+            'gateway' => $selected,
+            'activeAlertCount' => $this->openAlerts($selected['id'])->count(),
+            'activeAlerts' => $this->activeAlerts($selected['id']),
             'trendDevices' => $trend['devices'],
             'sensors' => self::SENSORS,
             'now' => $now,
@@ -189,16 +197,46 @@ class DashboardController extends Controller
         ]];
     }
 
-    /** Gateway utama (pertama dibuat) untuk API polling. */
-    private function gatewayRow(): array
+    /**
+     * Gateway yang dipilih: dari ?gateway=ID, lalu pilihan terakhir di session, lalu gateway pertama.
+     * Pilihan yang valid disimpan di session agar tetap terpilih saat dashboard dibuka lagi.
+     *
+     * @param  array<int, array{id: ?int}>  $gateways
+     */
+    private function selectedGateway(Request $request, array $gateways): array
     {
-        return $this->gatewayRows()[0];
+        $byId = array_column($gateways, null, 'id');
+        $wanted = $request->integer('gateway') ?: (int) $request->session()->get(self::SESSION_GATEWAY);
+
+        if (! isset($byId[$wanted])) {
+            return $gateways[0];
+        }
+
+        $request->session()->put(self::SESSION_GATEWAY, $wanted);
+
+        return $byId[$wanted];
     }
 
-    /** Peringatan yang belum selesai, terbaru dulu. */
-    private function activeAlerts(): array
+    /** Node milik gateway tertentu, urut node_id. Kosong bila belum ada gateway. */
+    private function gatewayDevices(?int $gatewayId): Collection
     {
-        return Alert::open()
+        if ($gatewayId === null) {
+            return collect();
+        }
+
+        return Device::query()->where('gateway_id', $gatewayId)->orderBy('node_id')->get();
+    }
+
+    /** Peringatan yang belum selesai dari node milik gateway tertentu. */
+    private function openAlerts(?int $gatewayId): Builder
+    {
+        return Alert::open()->whereHas('device', fn (Builder $q) => $q->where('gateway_id', $gatewayId));
+    }
+
+    /** Peringatan yang belum selesai dari gateway tertentu, terbaru dulu. */
+    private function activeAlerts(?int $gatewayId): array
+    {
+        return $this->openAlerts($gatewayId)
             ->with('device:id,name')
             ->latest('triggered_at')
             ->limit(self::ACTIVE_ALERT_LIMIT)
@@ -344,13 +382,12 @@ class DashboardController extends Controller
     }
 
     /** API untuk polling: return data dashboard terbaru (devices, status, measurements). */
-    public function liveData(): \Illuminate\Http\JsonResponse
+    public function liveData(Request $request): \Illuminate\Http\JsonResponse
     {
         $offlineMinutes = Device::offlineTimeoutMinutes();
+        $gateway = $this->selectedGateway($request, $this->gatewayRows());
         $latest = $this->latestMeasurements();
-        $devices = Device::query()
-            ->orderBy('node_id')
-            ->get()
+        $devices = $this->gatewayDevices($gateway['id'])
             ->map(fn (Device $device) => $this->deviceRow($device, $latest->get($device->id), $offlineMinutes))
             ->all();
 
@@ -359,12 +396,12 @@ class DashboardController extends Controller
 
         return response()->json([
             'devices' => $devices,
-            'alerts' => Cache::remember('dashboard_alerts_live', 30, fn () => $this->activeAlerts()),
+            'alerts' => Cache::remember('dashboard_alerts_live_'.($gateway['id'] ?? 0), 30, fn () => $this->activeAlerts($gateway['id'])),
             'onlineCount' => count($online),
             'offlineCount' => count($devices) - count($online),
             'powerNow' => $avg('power'),
             'temperatureNow' => $avg('temperature'),
-            'gateway' => $this->gatewayRow(),
+            'gateway' => $gateway,
             'timestamp' => now()->toIso8601String(),
         ]);
     }

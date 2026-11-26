@@ -210,10 +210,10 @@
             {{-- Status gateway --}}
             <section data-gateway-card class="relative rounded-3xl bg-primary p-5 text-white">
                 <div class="mb-4 flex items-center justify-between gap-2">
-                    <h1 data-gateway-name class="truncate text-base font-semibold">{{ $gateways[0]['nama'] }}</h1>
+                    <h1 class="truncate text-base font-semibold">{{ $gateway['nama'] }}</h1>
                     @if (count($gateways) > 1)
-                        {{-- Lebih dari satu gateway: panah bawah membuka daftar gateway lain --}}
-                        <button type="button" data-gateway-toggle aria-haspopup="listbox" aria-expanded="false" aria-controls="gateway-menu" aria-label="Pilih gateway lain"
+                        {{-- Lebih dari satu gateway: panah bawah membuka daftar gateway; memilih gateway memuat ulang seluruh dashboard untuk gateway itu --}}
+                        <button type="button" data-gateway-toggle aria-haspopup="menu" aria-expanded="false" aria-controls="gateway-menu" aria-label="Pilih gateway lain"
                             class="grid size-8 shrink-0 place-items-center rounded-full bg-white/10 hover:bg-white/20 [&>svg]:transition-transform [&>svg]:duration-200 aria-expanded:[&>svg]:rotate-180 motion-reduce:[&>svg]:transition-none">
                             <x-icon name="chevron-down" :size="16" />
                         </button>
@@ -225,19 +225,20 @@
                 </div>
 
                 @if (count($gateways) > 1)
-                    <div id="gateway-menu" data-gateway-menu data-state="closed" role="listbox" aria-label="Daftar gateway"
+                    <div id="gateway-menu" data-gateway-menu data-state="closed" role="menu" aria-label="Daftar gateway"
                         class="absolute top-14 right-5 z-20 w-60 origin-top-right rounded-2xl bg-white p-1.5 text-ink shadow-xl ring-1 ring-black/5
                                transition-all transition-discrete duration-150 ease-out motion-reduce:transition-none
                                opacity-100 scale-100 translate-y-0 starting:opacity-0 starting:scale-95 starting:-translate-y-1
                                data-[state=closed]:hidden data-[state=closed]:opacity-0 data-[state=closed]:scale-95 data-[state=closed]:-translate-y-1">
-                        @foreach ($gateways as $i => $gw)
-                            <button type="button" role="option" data-gateway-option="{{ $i }}" data-gateway-id="{{ $gw['id'] }}" data-name="{{ $gw['nama'] }}"
-                                aria-selected="{{ $loop->first ? 'true' : 'false' }}"
-                                class="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-canvas aria-selected:font-semibold">
+                        @foreach ($gateways as $gw)
+                            @php $current = $gw['id'] === $gateway['id']; @endphp
+                            <a href="{{ route('dashboard.index', ['gateway' => $gw['id']]) }}" role="menuitem" data-gateway-option
+                                @if ($current) aria-current="true" @endif
+                                class="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-canvas aria-[current=true]:font-semibold">
                                 <span class="size-2 shrink-0 rounded-full {{ $gw['internet_status'] === 'connected' ? 'bg-lime' : 'bg-red-400' }}"></span>
                                 <span class="min-w-0 flex-1 truncate">{{ $gw['nama'] }}</span>
-                                <span class="invisible text-primary group-aria-selected:visible"><x-icon name="check" :size="15" /></span>
-                            </button>
+                                <span class="invisible text-primary group-aria-[current=true]:visible"><x-icon name="check" :size="15" /></span>
+                            </a>
                         @endforeach
                         <a href="{{ route('gateway.index') }}" class="mt-1 flex items-center justify-between gap-2 rounded-xl border-t border-line px-3 py-2 text-sm text-muted hover:bg-canvas hover:text-ink">
                             Kelola gateway <x-icon name="arrow-up-right" :size="14" />
@@ -245,27 +246,23 @@
                     </div>
                 @endif
 
-                @foreach ($gateways as $i => $gw)
-                    <div data-gateway-panel="{{ $i }}" @unless ($loop->first) hidden @endunless>
-                        <p class="text-sm text-white/60">Status gateway</p>
-                        <p class="mt-1 flex items-center gap-2 text-3xl font-semibold">
-                            {{-- Online bila ada paket dari node mana pun dalam Offline Timeout (lihat Gateway::internetStatus) --}}
-                            <span class="size-2.5 rounded-full {{ $gw['internet_status'] === 'connected' ? 'bg-lime' : 'bg-red-400' }}"></span>
-                            {{ $gw['internet_status'] === 'connected' ? 'Online' : 'Offline' }}
-                        </p>
-                        <ul class="mt-4 space-y-2 text-sm">
-                            @foreach ([
-                                ['server', 'Broker MQTT', $gw['mqtt_status'] === 'connected' ? 'Terhubung' : 'Terputus'],
-                                ['radio', 'Data Terakhir', Format::relTime($gw['last_seen'])],
-                            ] as [$icon, $label, $value])
-                                <li class="flex items-center justify-between gap-2">
-                                    <span class="flex items-center gap-2 text-white/60"><x-icon :name="$icon" :size="15" /> {{ $label }}</span>
-                                    <span class="font-medium">{{ $value }}</span>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endforeach
+                <p class="text-sm text-white/60">Status gateway</p>
+                <p class="mt-1 flex items-center gap-2 text-3xl font-semibold">
+                    {{-- Online bila ada paket dari node mana pun dalam Offline Timeout (lihat Gateway::internetStatus) --}}
+                    <span class="size-2.5 rounded-full {{ $gateway['internet_status'] === 'connected' ? 'bg-lime' : 'bg-red-400' }}"></span>
+                    {{ $gateway['internet_status'] === 'connected' ? 'Online' : 'Offline' }}
+                </p>
+                <ul class="mt-4 space-y-2 text-sm">
+                    @foreach ([
+                        ['server', 'Broker MQTT', $gateway['mqtt_status'] === 'connected' ? 'Terhubung' : 'Terputus'],
+                        ['radio', 'Data Terakhir', Format::relTime($gateway['last_seen'])],
+                    ] as [$icon, $label, $value])
+                        <li class="flex items-center justify-between gap-2">
+                            <span class="flex items-center gap-2 text-white/60"><x-icon :name="$icon" :size="15" /> {{ $label }}</span>
+                            <span class="font-medium">{{ $value }}</span>
+                        </li>
+                    @endforeach
+                </ul>
             </section>
 
             {{-- Peringatan terbaru --}}
@@ -317,17 +314,15 @@
 
 @push('scripts')
 <script>
-// Kartu status gateway: dropdown untuk berpindah antar gateway (hanya ada bila gateway > 1)
+// Kartu status gateway: buka/tutup daftar gateway (hanya ada bila gateway > 1).
+// Tiap item adalah tautan ?gateway=ID, jadi seluruh dashboard dimuat ulang untuk gateway itu.
 (function () {
     const card = document.querySelector('[data-gateway-card]');
     const toggle = card?.querySelector('[data-gateway-toggle]');
     if (!toggle) return;
 
     const menu = card.querySelector('[data-gateway-menu]');
-    const nameEl = card.querySelector('[data-gateway-name]');
     const options = [...menu.querySelectorAll('[data-gateway-option]')];
-    const panels = [...card.querySelectorAll('[data-gateway-panel]')];
-    const STORE_KEY = 'dashboard.gateway';
 
     const isOpen = () => menu.dataset.state === 'open';
     const setOpen = (open) => {
@@ -335,33 +330,10 @@
         toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     };
 
-    const select = (index, remember = true) => {
-        const option = options[index];
-        if (!option) return;
-        options.forEach((o, i) => o.setAttribute('aria-selected', i === index ? 'true' : 'false'));
-        panels.forEach((p) => { p.hidden = p.dataset.gatewayPanel !== String(index); });
-        nameEl.textContent = option.dataset.name;
-        if (remember) {
-            try { localStorage.setItem(STORE_KEY, option.dataset.gatewayId); } catch (e) {}
-        }
-    };
-
-    // Pulihkan gateway yang terakhir dipilih
-    try {
-        const saved = localStorage.getItem(STORE_KEY);
-        const index = options.findIndex((o) => o.dataset.gatewayId === saved);
-        if (index > 0) select(index, false);
-    } catch (e) {}
-
     toggle.addEventListener('click', () => {
         setOpen(!isOpen());
-        if (isOpen()) (options.find((o) => o.getAttribute('aria-selected') === 'true') ?? options[0]).focus();
+        if (isOpen()) (options.find((o) => o.getAttribute('aria-current') === 'true') ?? options[0]).focus();
     });
-    options.forEach((o, i) => o.addEventListener('click', () => {
-        select(i);
-        setOpen(false);
-        toggle.focus();
-    }));
     document.addEventListener('click', (e) => {
         if (isOpen() && !menu.contains(e.target) && !toggle.contains(e.target)) setOpen(false);
     });
@@ -408,6 +380,38 @@
         for (let v = lo; v <= hi + step / 2; v += step) ticks.push(+v.toFixed(6));
         return ticks;
     };
+
+    /**
+     * Kurva halus melalui semua titik (interpolasi monotone cubic, seperti d3.curveMonotoneX):
+     * tidak menyiku, dan tidak melampaui nilai data (kurva tidak turun di bawah minimum / naik di atas maksimum).
+     * pts: [[x, y], ...] urut menurut x.
+     */
+    function smoothPath(pts) {
+        const n = pts.length;
+        if (n < 3) return pts.map(([px, py], k) => `${k ? 'L' : 'M'}${px} ${py}`).join('');
+
+        const sign = (v) => (v < 0 ? -1 : v > 0 ? 1 : 0);
+        const h = [], s = [];
+        for (let k = 0; k < n - 1; k++) {
+            h[k] = pts[k + 1][0] - pts[k][0];
+            s[k] = h[k] ? (pts[k + 1][1] - pts[k][1]) / h[k] : 0;
+        }
+        // Kemiringan di titik tengah: 0 bila arah berbalik (puncak/lembah), selain itu dibatasi agar tetap monoton
+        const t = [];
+        for (let k = 1; k < n - 1; k++) {
+            const p = (s[k - 1] * h[k] + s[k] * h[k - 1]) / (h[k - 1] + h[k]);
+            t[k] = (sign(s[k - 1]) + sign(s[k])) * Math.min(Math.abs(s[k - 1]), Math.abs(s[k]), 0.5 * Math.abs(p)) || 0;
+        }
+        t[0] = (3 * s[0] - t[1]) / 2;
+        t[n - 1] = (3 * s[n - 2] - t[n - 2]) / 2;
+
+        let d = `M${pts[0][0]} ${pts[0][1]}`;
+        for (let k = 0; k < n - 1; k++) {
+            const [x0, y0] = pts[k], [x1, y1] = pts[k + 1], dx = h[k] / 3;
+            d += `C${x0 + dx} ${y0 + t[k] * dx} ${x1 - dx} ${y1 - t[k + 1] * dx} ${x1} ${y1}`;
+        }
+        return d;
+    }
 
     function draw() {
         const meta = SENSORS[sensor];
@@ -485,15 +489,22 @@
                 });
             });
         } else {
-            // Satu garis per perangkat; titik tetap digambar agar data yang jarang terlihat
+            // Satu kurva halus per perangkat + arsiran gradasi tipis di bawahnya; titik tetap digambar agar data yang jarang terlihat
+            const defs = el('defs', {}, svg);
+            const base = y(y0);
             data.series.forEach((s, si) => {
                 const color = colorOf(si);
-                const pts = s.data.map((v, i) => (v == null ? null : [i, v])).filter(Boolean);
+                const pts = s.data.map((v, i) => (v == null ? null : [x(i), y(v)])).filter(Boolean);
                 if (pts.length > 1) {
-                    const d = pts.map(([i, v], k) => `${k ? 'L' : 'M'}${x(i)} ${y(v)}`).join('');
-                    el('path', { d, fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'pointer-events': 'none' }, svg);
+                    const line = smoothPath(pts);
+                    const gid = `trend-fill-${si}`;
+                    const grad = el('linearGradient', { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+                    el('stop', { offset: '0%', 'stop-color': color, 'stop-opacity': data.series.length > 1 ? 0.10 : 0.18 }, grad);
+                    el('stop', { offset: '100%', 'stop-color': color, 'stop-opacity': 0 }, grad);
+                    el('path', { d: `${line}L${pts.at(-1)[0]} ${base}L${pts[0][0]} ${base}Z`, fill: `url(#${gid})`, 'pointer-events': 'none' }, svg);
+                    el('path', { d: line, fill: 'none', stroke: color, 'stroke-width': 2.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'pointer-events': 'none' }, svg);
                 }
-                pts.forEach(([i, v]) => el('circle', { cx: x(i), cy: y(v), r: 3, fill: color, stroke: '#fff', 'stroke-width': 1.5, 'pointer-events': 'none' }, svg));
+                pts.forEach(([px, py]) => el('circle', { cx: px, cy: py, r: 3, fill: '#fff', stroke: color, 'stroke-width': 1.5, 'pointer-events': 'none' }, svg));
             });
         }
 
