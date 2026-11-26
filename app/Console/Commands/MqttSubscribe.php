@@ -172,18 +172,17 @@ class MqttSubscribe extends Command
 
     private function handleMessage(string $topic, string $message, TelemetryIngestor $ingestor, LegacyGatewayPayloadAdapter $adapter, GatewayStatusUpdater $statusUpdater): void
     {
-        // vpp/kampus/{nama_node}: topik tidak memuat kode gateway, jadi gateway ditentukan dari konfigurasi
-        $gatewayCode = MqttSettings::gatewayCode();
-        if ($gatewayCode === null) {
-            Log::warning('MQTT: gateway tujuan tidak ditentukan (isi setting gateway_code atau sisakan satu gateway)', ['topic' => $topic]);
+        // vpp/kampus/{kode_gateway}/{nama_node}: gateway dan node ditentukan dari topik
+        $segments = explode('/', $topic);
+        if (count($segments) !== 4 || $segments[2] === '' || $segments[3] === '') {
+            Log::warning('MQTT: topik harus berformat vpp/kampus/kode_gateway/nama_node', ['topic' => $topic]);
 
             return;
         }
-
-        $topicNode = explode('/', $topic)[2] ?? null;
+        [, , $gatewayCode, $topicNode] = $segments;
 
         $payload = json_decode($message, true);
-        if (! is_array($payload) || $topicNode === null) {
+        if (! is_array($payload)) {
             Log::warning('MQTT: pesan bukan JSON yang valid', ['topic' => $topic]);
 
             return;
@@ -191,7 +190,9 @@ class MqttSubscribe extends Command
 
         // Pesan dari gateway sampai ke server = koneksi internet gateway berfungsi saat ini
         try {
-            $statusUpdater->markInternetConnected($gatewayCode);
+            if (! $statusUpdater->markInternetConnected($gatewayCode)) {
+                return; // gateway tidak dikenal, sudah dicatat
+            }
         } catch (Throwable $e) {
             Log::error('MQTT: gagal memperbarui status internet', ['topic' => $topic, 'error' => $e->getMessage()]);
         }

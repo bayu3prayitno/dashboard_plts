@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Gateway;
 use App\Models\Setting;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
@@ -26,10 +25,10 @@ class MqttSettings
     public const CLIENT_ID = 'omahiot-subscriber';
 
     /**
-     * Pola topik tetap (tidak bisa diubah dari menu) sesuai firmware gateway yang sudah terpasang:
-     * vpp/kampus/node1, vpp/kampus/node2, vpp/kampus/node3.
+     * Pola topik tetap (tidak bisa diubah dari menu): vpp/kampus/{kode_gateway}/node{node_id},
+     * mis. vpp/kampus/GW-3fa9c/node1. Kode gateway menentukan gateway, node{node_id} menentukan node.
      */
-    public const TOPIC = 'vpp/kampus/+';
+    public const TOPIC = 'vpp/kampus/+/+';
 
     /**
      * Nilai efektif untuk subscriber: host, port, username, password (plain atau null), tls, client_id, topic.
@@ -58,23 +57,6 @@ class MqttSettings
         $stored['mqtt_password'] = '';
 
         return $stored;
-    }
-
-    /**
-     * Kode gateway yang menerima data dari topik vpp/kampus/+ (firmware tidak mengirim kode gateway).
-     * Urutan penentuan: setting 'gateway_code' bila diisi; jika kosong dan hanya ada satu gateway,
-     * gateway tersebut. Selain itu null (data tidak bisa dikaitkan ke gateway).
-     */
-    public static function gatewayCode(): ?string
-    {
-        $configured = Setting::query()->where('key', 'gateway_code')->value('value');
-        if (is_string($configured) && $configured !== '') {
-            return $configured;
-        }
-
-        $codes = Gateway::query()->limit(2)->pluck('gateway_code');
-
-        return $codes->count() === 1 ? (string) $codes->first() : null;
     }
 
     /** Sidik jari nilai tersimpan. Subscriber memulai ulang bila nilai ini berubah. */

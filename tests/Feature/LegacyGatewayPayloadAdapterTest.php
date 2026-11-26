@@ -37,25 +37,19 @@ class LegacyGatewayPayloadAdapterTest extends TestCase
         ], $overrides);
     }
 
-    public function test_alias_names_map_to_node_ids(): void
+    public function test_node_name_maps_to_node_id(): void
     {
         $this->assertSame(1, LegacyGatewayPayloadAdapter::resolveNodeId('node1'));
-        $this->assertSame(2, LegacyGatewayPayloadAdapter::resolveNodeId('node2'));
         $this->assertSame(3, LegacyGatewayPayloadAdapter::resolveNodeId('node3'));
+        $this->assertSame(12, LegacyGatewayPayloadAdapter::resolveNodeId('node12'));
     }
 
-    public function test_numeric_name_is_accepted_and_unknown_name_is_rejected(): void
+    public function test_other_node_name_formats_are_rejected(): void
     {
-        $this->assertSame(5, LegacyGatewayPayloadAdapter::resolveNodeId('5'));
+        $this->assertNull(LegacyGatewayPayloadAdapter::resolveNodeId('5'));
+        $this->assertNull(LegacyGatewayPayloadAdapter::resolveNodeId('node0'));
+        $this->assertNull(LegacyGatewayPayloadAdapter::resolveNodeId('node01'));
         $this->assertNull(LegacyGatewayPayloadAdapter::resolveNodeId('sensor-x'));
-        $this->assertNull(LegacyGatewayPayloadAdapter::resolveNodeId('0'));
-    }
-
-    public function test_alias_can_be_added_from_config(): void
-    {
-        config(['mqtt.node_aliases' => ['panel-utara' => 2]]);
-
-        $this->assertSame(2, LegacyGatewayPayloadAdapter::resolveNodeId('panel-utara'));
     }
 
     public function test_firmware_payload_is_translated_to_ingest_format(): void

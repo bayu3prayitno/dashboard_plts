@@ -42,6 +42,8 @@
                     @endforeach
                 </select>
                 @error('gateway_id')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
+                {{-- ID Node tidak bisa diubah di sini, jadi bentrok ID Node hanya terjadi saat pindah gateway --}}
+                @error('node_id')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
             </div>
 
             <!-- Node ID field for validation (tetap dikirim agar update konsisten dengan store) -->

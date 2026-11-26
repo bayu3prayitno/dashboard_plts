@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class DeviceController extends Controller
@@ -100,16 +101,29 @@ class DeviceController extends Controller
 
     public function create(): View
     {
+        $gateways = Gateway::orderBy('name')->get();
+
+        // ID Node berikutnya per gateway, supaya pengguna tidak perlu menebak nomor yang belum dipakai.
+        // ID Node hanya unik di dalam satu gateway, jadi gateway lain boleh memakai nomor yang sama.
+        $maxPerGateway = Device::query()
+            ->selectRaw('gateway_id, MAX(node_id) AS max_node_id')
+            ->groupBy('gateway_id')
+            ->pluck('max_node_id', 'gateway_id');
+
+        $nextNodeIds = $gateways->mapWithKeys(fn (Gateway $gateway) => [
+            $gateway->id => (int) ($maxPerGateway[$gateway->id] ?? 0) + 1,
+        ]);
+
         return view('dashboard.devices.create', [
-            'gateways' => Gateway::orderBy('name')->get(),
-            // ID Node berikutnya, supaya pengguna tidak perlu menebak nomor yang belum dipakai
-            'nextNodeId' => (int) Device::max('node_id') + 1,
+            'gateways' => $gateways,
+            'nextNodeIds' => $nextNodeIds,
+            'nextNodeId' => $nextNodeIds[old('gateway_id')] ?? 1,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate($this->rules());
+        $data = $request->validate($this->rules($request), $this->messages());
         $data['is_active'] = true;
 
         $device = Device::create($data);
@@ -130,9 +144,9 @@ class DeviceController extends Controller
 
     public function update(Request $request, Device $device): RedirectResponse
     {
-        $data = $request->validate($this->rules() + [
+        $data = $request->validate($this->rules($request, $device) + [
             'status' => ['required', 'in:active,inactive'],
-        ]);
+        ], $this->messages());
 
         $before = $device->getAttributes();
 
@@ -199,14 +213,32 @@ class DeviceController extends Controller
         ]);
     }
 
-    /** @return array<string, array<int, string>> */
-    private function rules(): array
+    /**
+     * ID Node wajib unik di dalam satu gateway, tetapi boleh sama bila gatewaynya berbeda
+     * (topik MQTT vpp/kampus/{kode_gateway}/node{node_id} tetap berbeda).
+     * Saat update, perangkat itu sendiri dikecualikan dari pengecekan.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function rules(Request $request, ?Device $device = null): array
     {
+        $uniquePerGateway = Rule::unique('devices', 'node_id')
+            ->where('gateway_id', $request->integer('gateway_id'))
+            ->ignore($device?->id);
+
         return [
             'gateway_id' => ['required', 'integer', 'exists:gateways,id'],
-            'node_id' => ['required', 'integer', 'min:1'],
+            'node_id' => ['required', 'integer', 'min:1', $uniquePerGateway],
             'name' => ['required', 'string', 'max:255'],
             'location' => ['required', 'string', 'max:255'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function messages(): array
+    {
+        return [
+            'node_id.unique' => 'ID Node :input sudah dipakai perangkat lain di gateway ini. Pilih ID Node lain atau gateway lain.',
         ];
     }
 }

@@ -133,8 +133,7 @@
                     'power' => 14.5,
                     'irradiance' => 650,
                 ];
-                // Firmware gateway menerbitkan ke topik vpp/kampus/{nama}: tanpa node_id dan packet_no
-                // (node_id dari nama topik, packet_no dibuat server)
+                // Gateway menambahkan RSSI, SNR, dan packet loss sebelum diterbitkan ke MQTT
                 $mqttPayload = [
                     'temp' => 28.5,
                     'voltage' => 12.1,
@@ -156,7 +155,7 @@
 
             <p class="text-sm text-ink mt-6 mb-2">Pesan yang diterbitkan Gateway ke MQTT (nilai contoh). RSSI, SNR, dan packet loss ditambahkan Gateway:</p>
             <pre class="bg-ink text-lime text-xs p-4 rounded-2xl overflow-x-auto">{{ json_encode($mqttPayload, JSON_PRETTY_PRINT) }}</pre>
-            <p class="text-xs text-muted mt-2">Gateway mengirim satu pesan per paket baru. Nama topik menentukan <span class="font-mono">node_id</span>, sehingga nama topik harus sesuai dengan MQTT_TOPIC di atas.</p>
+            <p class="text-xs text-muted mt-2">Gateway mengirim satu pesan per paket baru. Topik menentukan gateway dan <span class="font-mono">node_id</span>, sehingga topik harus sama persis dengan MQTT_TOPIC di atas.</p>
         @else
             <p class="text-sm text-muted">Perangkat belum terhubung ke Gateway. Edit perangkat dan pilih Gateway untuk melihat konfigurasi.</p>
         @endif

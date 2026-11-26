@@ -8,7 +8,7 @@ use App\Models\Measurement;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Menerjemahkan payload firmware gateway (topik vpp/kampus/{nama_node}, JSON tanpa node_id
+ * Menerjemahkan payload firmware gateway (topik vpp/kampus/{kode_gateway}/node{node_id}, JSON tanpa node_id
  * dan packet_no) menjadi format yang diterima TelemetryIngestor. Satu-satunya tempat
  * pemetaan format firmware ini.
  *
@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Log;
 class LegacyGatewayPayloadAdapter
 {
     /**
-     * @param  string  $gatewayCode  kode gateway tujuan (lihat MqttSettings::gatewayCode)
+     * @param  string  $gatewayCode  kode gateway dari topik, mis. "GW-3fa9c"
      * @param  string  $topicNode  segmen terakhir topik, mis. "node1"
      * @param  array<string, mixed>  $payload  JSON dari firmware
      * @return array<string, mixed>|null data siap diingest, atau null bila node tidak bisa dipetakan
@@ -63,23 +63,10 @@ class LegacyGatewayPayloadAdapter
         ];
     }
 
-    /**
-     * Alias nama di config('mqtt.node_aliases') lebih dulu, lalu angka langsung (mis. "2").
-     * Null bila tidak dikenali.
-     */
+    /** Nama node berformat node{node_id}, mis. "node1" => 1. Null untuk format lain (mis. "2", "node01"). */
     public static function resolveNodeId(string $topicNode): ?int
     {
-        $aliases = (array) config('mqtt.node_aliases', []);
-
-        if (array_key_exists($topicNode, $aliases)) {
-            return (int) $aliases[$topicNode];
-        }
-
-        if (ctype_digit($topicNode) && (int) $topicNode >= 1) {
-            return (int) $topicNode;
-        }
-
-        return null;
+        return preg_match('/^node([1-9][0-9]*)$/', $topicNode, $match) === 1 ? (int) $match[1] : null;
     }
 
     /** Angka yang valid dan terbatas; NaN/Infinity atau teks lain dianggap kosong. */

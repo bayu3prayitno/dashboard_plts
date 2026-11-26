@@ -13,8 +13,8 @@
             <!-- Node ID -->
             <div>
                 <label class="block text-sm font-semibold text-ink mb-2">ID Node</label>
-                <input type="number" name="node_id" min="1" value="{{ old('node_id', $nextNodeId) }}" placeholder="1" class="w-full px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary" required>
-                <p class="text-xs text-muted mt-1">Terisi otomatis dengan nomor berikutnya. Nilai ini nanti dimasukkan ke firmware Node setelah perangkat disimpan.</p>
+                <input type="number" id="node_id" name="node_id" min="1" value="{{ old('node_id', $nextNodeId) }}" placeholder="1" class="w-full px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary" required>
+                <p class="text-xs text-muted mt-1">Terisi otomatis dengan nomor berikutnya di gateway yang dipilih. ID Node tidak boleh sama dalam satu gateway, tetapi boleh sama dengan node di gateway lain. Nilai ini nanti dimasukkan ke firmware Node setelah perangkat disimpan.</p>
                 @error('node_id')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
             </div>
 
@@ -35,7 +35,7 @@
             <!-- Gateway -->
             <div>
                 <label class="block text-sm font-semibold text-ink mb-2">Gateway Terhubung</label>
-                <select name="gateway_id" class="w-full px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary" required>
+                <select id="gateway_id" name="gateway_id" class="w-full px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary" required>
                     <option value="">Pilih Gateway</option>
                     @foreach($gateways as $gateway)
                         <option value="{{ $gateway->id }}" @selected(old('gateway_id') == $gateway->id)>{{ $gateway->name }}</option>
@@ -85,3 +85,24 @@
     </aside>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(() => {
+    // ID Node berikutnya per gateway. Saat gateway diganti, ID Node ikut diganti,
+    // kecuali pengguna sudah mengetik ID Node sendiri.
+    const nextNodeIds = @json($nextNodeIds);
+    const gatewaySelect = document.getElementById('gateway_id');
+    const nodeInput = document.getElementById('node_id');
+    if (!gatewaySelect || !nodeInput) return;
+
+    let editedByUser = {{ old('node_id') !== null ? 'true' : 'false' }};
+    nodeInput.addEventListener('input', () => { editedByUser = true; });
+
+    gatewaySelect.addEventListener('change', () => {
+        if (editedByUser) return;
+        nodeInput.value = nextNodeIds[gatewaySelect.value] ?? 1;
+    });
+})();
+</script>
+@endpush
