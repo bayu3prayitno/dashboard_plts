@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Log;
  * dan packet_no) menjadi format yang diterima TelemetryIngestor. Satu-satunya tempat
  * pemetaan format firmware ini.
  *
- * Firmware: {"temp","voltage","current","power","irradiance","rssi","snr"}
+ * Firmware: {"temp","voltage","current","power","irradiance","rssi","snr","packet_loss"}
+ *           (packet_loss dalam persen, opsional)
  * Hasil  : node_id, packet_no (berurutan dari server), temperature, dan field lain.
  */
 class LegacyGatewayPayloadAdapter
@@ -56,8 +57,8 @@ class LegacyGatewayPayloadAdapter
             'irradiance' => self::number($payload['irradiance'] ?? null),
             'rssi' => self::integer($payload['rssi'] ?? null),
             'snr' => self::number($payload['snr'] ?? null),
-            // Firmware hanya mengirim jumlah hilang kumulatif, bukan persen: tidak dipakai
-            'packet_loss' => null,
+            // Packet loss (%) apa adanya dari payload gateway; server tidak menghitung sendiri
+            'packet_loss' => self::percent($payload['packet_loss'] ?? null, $gatewayCode, $nodeId),
             // Waktu terima server dipakai (firmware tidak mengirim waktu)
             'recorded_at' => null,
         ];
@@ -73,6 +74,22 @@ class LegacyGatewayPayloadAdapter
     private static function number(mixed $value): ?float
     {
         return is_numeric($value) && is_finite((float) $value) ? (float) $value : null;
+    }
+
+    /**
+     * Persen 0–100. Di luar rentang dianggap kosong (dicatat) agar data sensor lain di paket
+     * yang sama tetap tersimpan, tidak ikut ditolak validasi.
+     */
+    private static function percent(mixed $value, string $gatewayCode, int $nodeId): ?float
+    {
+        $number = self::number($value);
+        if ($number !== null && ($number < 0 || $number > 100)) {
+            Log::warning('MQTT: packet_loss di luar 0–100%, diabaikan', ['gateway' => $gatewayCode, 'node_id' => $nodeId, 'packet_loss' => $value]);
+
+            return null;
+        }
+
+        return $number;
     }
 
     private static function integer(mixed $value): ?int

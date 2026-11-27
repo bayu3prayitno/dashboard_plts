@@ -60,8 +60,21 @@ class LegacyGatewayPayloadAdapterTest extends TestCase
         $this->assertSame(1, $data['packet_no']);
         $this->assertSame(31.5, $data['temperature']);
         $this->assertSame(-95, $data['rssi']);
-        $this->assertNull($data['packet_loss']);
+        $this->assertNull($data['packet_loss']); // payload tanpa packet_loss
         $this->assertNull($data['recorded_at']);
+    }
+
+    public function test_packet_loss_is_taken_from_payload_as_is(): void
+    {
+        $adapter = app(LegacyGatewayPayloadAdapter::class);
+
+        $data = $adapter->translate($this->gateway->gateway_code, 'node1', $this->firmwarePayload(['packet_loss' => 2.5]));
+        $this->assertSame(2.5, $data['packet_loss']);
+
+        // Di luar 0–100% diabaikan, data sensor lain tetap diteruskan
+        $data = $adapter->translate($this->gateway->gateway_code, 'node1', $this->firmwarePayload(['packet_loss' => 150]));
+        $this->assertNull($data['packet_loss']);
+        $this->assertSame(31.5, $data['temperature']);
     }
 
     public function test_packet_number_continues_from_last_stored_packet(): void

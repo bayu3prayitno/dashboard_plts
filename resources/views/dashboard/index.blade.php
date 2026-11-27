@@ -201,7 +201,7 @@
                     <text x="100" y="88" text-anchor="middle" class="fill-ink text-[34px] font-semibold">{{ $received === null ? '—' : round($received).'%' }}</text>
                     <text x="100" y="108" text-anchor="middle" class="fill-muted text-[11px]">paket diterima</text>
                 </svg>
-                <p class="mt-2 text-center text-xs text-muted">Rata-rata node aktif, 24 jam terakhir</p>
+                <p class="mt-2 text-center text-xs text-muted">Rata-rata node aktif, dari packet loss paket terakhir</p>
             </section>
 
             {{-- Status gateway --}}
@@ -289,7 +289,7 @@
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <div>
                         <h2 class="text-base font-semibold">Kualitas LoRa per Node</h2>
-                        <p class="mt-0.5 text-xs text-muted">Sinyal dari paket terakhir · paket diterima 24 jam terakhir</p>
+                        <p class="mt-0.5 text-xs text-muted">Sinyal dan packet loss dari paket terakhir</p>
                     </div>
                     <a href="{{ route('devices.index') }}" class="rounded-full border border-line px-3 py-1 text-xs font-medium hover:bg-canvas">Kelola</a>
                 </div>
@@ -298,7 +298,6 @@
                 @endif
                 <ul class="space-y-1">
                     @foreach ($devices as $d)
-                        @php $link = $d['link']; @endphp
                         <li>
                             <a href="{{ route('devices.show', $d['id']) }}" class="flex items-center gap-3 rounded-2xl p-2 hover:bg-canvas">
                                 <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-sm font-semibold">{{ $d['node_id'] }}</span>
@@ -318,11 +317,11 @@
                                     </span>
                                 </span>
                                 <span class="w-24 shrink-0 text-right">
-                                    @if ($link['percent'] !== null)
-                                        <span class="block text-sm font-semibold tabular-nums">{{ Format::num($link['percent'], 0) }}%</span>
-                                        <span class="block text-[11px] text-muted tabular-nums" title="Paket diterima / seharusnya (1 paket per interval beacon)">{{ $link['received'] }}/{{ $link['expected'] }} paket</span>
+                                    @if ($d['received'] !== null)
+                                        <span class="block text-sm font-semibold tabular-nums">{{ Format::num($d['received'], 0) }}%</span>
+                                        <span class="block text-[11px] text-muted tabular-nums" title="Packet loss dari payload paket terakhir">loss {{ Format::num($d['packet_loss'], 1) }}%</span>
                                         <span class="mt-1 block h-1.5 overflow-hidden rounded-full bg-line">
-                                            <span class="block h-full rounded-full {{ $link['percent'] >= 90 ? 'bg-lime' : ($link['percent'] >= 70 ? 'bg-amber-400' : 'bg-red-400') }}" style="width: {{ $link['percent'] }}%"></span>
+                                            <span class="block h-full rounded-full {{ $d['received'] >= 90 ? 'bg-lime' : ($d['received'] >= 70 ? 'bg-amber-400' : 'bg-red-400') }}" style="width: {{ $d['received'] }}%"></span>
                                         </span>
                                     @else
                                         <span class="text-xs text-muted">—</span>
