@@ -163,5 +163,105 @@
             </button>
         </form>
     </section>
+
+    {{-- Kartu 3: Tombol darurat developer (hanya Super Admin) --}}
+    @if ($canResetData)
+        @php
+            $resetErrors = $errors->getBag('reset');
+            $checkedScopes = old('scopes', ['measurements', 'alerts']);
+        @endphp
+        @php
+            $warnIcon = 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z';
+        @endphp
+
+        {{-- Hanya ikon kecil; kartu Zona Bahaya muncul sebagai modal saat ikon dipencet --}}
+        <div class="flex justify-end xl:col-span-2">
+            <button type="button" onclick="openResetModal()" title="Zona Bahaya: Reset Data" aria-label="Buka Zona Bahaya: Reset Data"
+                    class="grid size-10 place-items-center rounded-full border border-red-200 bg-white/60 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700">
+                {!! $svg($warnIcon, 'size-5') !!}
+            </button>
+        </div>
+
+        <div id="reset-modal" class="fixed inset-0 z-50 {{ $resetErrors->any() ? 'flex' : 'hidden' }} items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="reset-modal-title">
+        <div class="absolute inset-0 bg-ink/40 backdrop-blur-[2px]" onclick="closeResetModal()"></div>
+        <section class="card relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-y-auto border-red-200 p-6 shadow-xl md:p-8">
+            <header class="mb-6 flex items-start gap-4 border-b border-red-100 pb-6">
+                <div class="grid size-12 shrink-0 place-items-center rounded-2xl bg-red-50 text-red-600">
+                    {!! $svg($warnIcon, 'size-6') !!}
+                </div>
+                <div class="flex-1">
+                    <h2 id="reset-modal-title" class="text-lg font-bold text-red-700">Zona Bahaya: Reset Data</h2>
+                    <p class="mt-0.5 text-sm text-muted">Tombol darurat untuk mengosongkan data. Pengguna, gateway, perangkat, ambang batas, dan pengaturan <b class="text-ink">tidak</b> ikut terhapus. Tindakan ini tidak bisa dibatalkan.</p>
+                </div>
+                <button type="button" onclick="closeResetModal()" aria-label="Tutup" class="grid size-9 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-canvas hover:text-ink">
+                    {!! $svg('M6 18L18 6M6 6l12 12', 'size-5') !!}
+                </button>
+            </header>
+
+            <form method="POST" action="{{ route('settings.resetData') }}" class="grid grid-cols-1 gap-6 lg:grid-cols-2"
+                  onsubmit="return confirm('Yakin hapus data yang dipilih? Data tidak bisa dikembalikan.');">
+                @csrf
+
+                <fieldset>
+                    <legend class="{{ $labelCls }}">Data yang dihapus</legend>
+                    <div class="space-y-2">
+                        @foreach ($resetScopes as $key => $label)
+                            <label class="flex items-start gap-2 text-sm text-ink">
+                                <input type="checkbox" name="scopes[]" value="{{ $key }}" @checked(in_array($key, $checkedScopes, true))
+                                       class="mt-0.5 rounded border-line text-red-600 focus:ring-red-300">
+                                {{ $label }}
+                            </label>
+                        @endforeach
+                    </div>
+                    @if ($resetErrors->has('scopes'))
+                        <p class="mt-2 text-xs text-red-600">{{ $resetErrors->first('scopes') }}</p>
+                    @endif
+                </fieldset>
+
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <label class="{{ $labelCls }}" for="confirm_text">Ketik <code class="rounded bg-red-50 px-1.5 text-red-700">RESET</code> untuk konfirmasi</label>
+                        <div class="{{ $chromeCls }}">
+                            <input id="confirm_text" type="text" name="confirm_text" autocomplete="off" required class="{{ $fieldCls }}">
+                        </div>
+                        @if ($resetErrors->has('confirm_text'))
+                            <p class="mt-1.5 text-xs text-red-600">{{ $resetErrors->first('confirm_text') }}</p>
+                        @endif
+                    </div>
+                    <div>
+                        <label class="{{ $labelCls }}" for="reset_password">Password akun Anda</label>
+                        <div class="{{ $chromeCls }}">
+                            <span class="{{ $tileCls }}">{!! $svg($icons['lock'], 'size-5') !!}</span>
+                            <input id="reset_password" type="password" name="password" autocomplete="current-password" required class="{{ $fieldCls }}">
+                        </div>
+                        @if ($resetErrors->has('password'))
+                            <p class="mt-1.5 text-xs text-red-600">{{ $resetErrors->first('password') }}</p>
+                        @endif
+                    </div>
+
+                    <button type="submit" class="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-sm font-medium text-white transition-colors hover:bg-red-700">
+                        {!! $svg('M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0', 'size-5') !!}
+                        Reset Data Sekarang
+                    </button>
+                </div>
+            </form>
+        </section>
+        </div>
+
+        <script>
+            function openResetModal() {
+                const m = document.getElementById('reset-modal');
+                m.classList.remove('hidden');
+                m.classList.add('flex');
+                document.getElementById('confirm_text')?.focus();
+            }
+            function closeResetModal() {
+                const m = document.getElementById('reset-modal');
+                m.classList.add('hidden');
+                m.classList.remove('flex');
+            }
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeResetModal(); });
+        </script>
+    @endif
 </div>
 @endsection

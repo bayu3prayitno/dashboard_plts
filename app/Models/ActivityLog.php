@@ -73,6 +73,13 @@ class ActivityLog extends Model
     /** Rincian aktivitas untuk tabel audit log, disusun dari nilai sebelum & sesudah. */
     public function details(): string
     {
+        if ($this->action === 'data.reset') {
+            $deleted = collect($this->properties['after']['deleted'] ?? [])
+                ->map(fn ($n, $k) => "{$k}: {$n}")->implode(', ');
+
+            return 'Reset data darurat'.($deleted !== '' ? " ({$deleted})" : '');
+        }
+
         $label = $this->subjectLabel().' '.($this->properties['subject_key'] ?? '#'.$this->subject_id);
         $before = $this->properties['before'] ?? null;
         $after = $this->properties['after'] ?? null;

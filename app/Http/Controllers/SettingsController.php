@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\DataReset;
 use App\Services\MqttSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -44,6 +45,8 @@ class SettingsController extends Controller
             'settings' => $this->currentSystemSettings(),
             'mqtt' => MqttSettings::forForm(),
             'mqttHasPassword' => Setting::query()->where('key', 'mqtt_password')->where('value', '!=', '')->exists(),
+            'resetScopes' => DataReset::SCOPES,
+            'canResetData' => (bool) request()->user()?->isSuperAdmin(),
         ]);
     }
 
@@ -128,6 +131,39 @@ class SettingsController extends Controller
         }
 
         return redirect()->route('settings.system')->with('success', 'Pengaturan sistem disimpan.');
+    }
+
+    /**
+     * Tombol darurat developer: kosongkan data sensor / alert / audit log.
+     * Hanya Super Admin, wajib password akun dan mengetik RESET. Konfigurasi tidak ikut terhapus.
+     */
+    public function resetData(Request $request, DataReset $reset): RedirectResponse
+    {
+        abort_unless($request->user()?->isSuperAdmin(), 403);
+
+        $data = $request->validateWithBag('reset', [
+            'scopes' => ['required', 'array', 'min:1'],
+            'scopes.*' => ['string', Rule::in(array_keys(DataReset::SCOPES))],
+            'confirm_text' => ['required', 'in:RESET'],
+            'password' => ['required', 'current_password'],
+        ], [
+            'scopes.required' => 'Pilih minimal satu data yang akan direset.',
+            'confirm_text.in' => 'Ketik RESET (huruf kapital) untuk konfirmasi.',
+            'password.current_password' => 'Password salah.',
+        ]);
+
+        $deleted = $reset->run(array_values(array_unique($data['scopes'])));
+
+        // Dicatat setelah reset, sehingga tetap ada jejak walau audit log ikut dikosongkan
+        ActivityLog::record($request->user()->id, 'data.reset', $request->user(), null, ['deleted' => $deleted]);
+
+        $summary = collect($deleted)->map(fn (int $n, string $k) => number_format($n, 0, ',', '.').' '.match ($k) {
+            'measurements' => 'data sensor',
+            'alerts' => 'alert',
+            'activity_logs' => 'audit log',
+        })->implode(', ');
+
+        return redirect()->route('settings.system')->with('success', "Reset data selesai: {$summary} dihapus.");
     }
 
     /** Audit log dengan filter pencarian dan pengguna, serta ringkasan jumlah aktivitas. */
