@@ -116,9 +116,6 @@
                 <h3 class="text-lg font-semibold text-ink">Konfigurasi Firmware Node</h3>
                 <p class="text-sm text-muted">Masukkan nilai berikut ke program perangkat agar datanya dikenali sistem.</p>
             </div>
-            @if($device->gateway)
-                <button type="button" onclick="copyFirmwareConfig()" class="shrink-0 btn btn-primary text-sm">Salin</button>
-            @endif
         </div>
 
         @if($device->gateway)
@@ -162,7 +159,7 @@
     </div>
 
     <!-- Tren 24 jam (rata-rata per 30 menit) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 hidden">
         <div class="card">
             <h3 class="text-lg font-semibold text-ink mb-4">Trend Suhu (24 Jam)</h3>
             <div class="relative h-64">
@@ -178,7 +175,7 @@
     </div>
 
     <!-- Recent Alerts -->
-    <div class="card">
+    <div class="card hidden">
         <h3 class="text-lg font-semibold text-ink mb-4">Peringatan Terbaru</h3>
         <div class="space-y-3">
             @forelse($alerts as $alert)
