@@ -121,15 +121,21 @@
         @endif
     </section>
 
-    <!-- Grafik (data dari endpoint chart-data, mengikuti filter di atas) -->
+    <!-- Grafik (data dari endpoint chart-data, mengikuti filter di atas); satu garis per node -->
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section class="card">
             <h2 class="mb-4 text-base font-semibold">Grafik Suhu</h2>
-            <div class="relative h-64"><canvas id="chart-temperature" aria-label="Grafik suhu"></canvas></div>
+            <div class="relative h-64"><canvas id="chart-temperature" aria-label="Grafik suhu per node"></canvas></div>
         </section>
         <section class="card">
-            <h2 class="mb-4 text-base font-semibold">Grafik Tegangan & Arus</h2>
-            <div class="relative h-64"><canvas id="chart-voltage-current" aria-label="Grafik tegangan dan arus"></canvas></div>
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h2 class="text-base font-semibold">Grafik Tegangan & Arus</h2>
+                <div class="inline-flex gap-1 rounded-2xl bg-canvas p-1" role="group" aria-label="Pilih besaran">
+                    <button type="button" data-vc-sensor="voltage" aria-pressed="true" class="rounded-xl bg-primary px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors">Tegangan</button>
+                    <button type="button" data-vc-sensor="current" aria-pressed="false" class="rounded-xl px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:text-ink">Arus</button>
+                </div>
+            </div>
+            <div class="relative h-64"><canvas id="chart-voltage-current" aria-label="Grafik tegangan atau arus per node"></canvas></div>
         </section>
         <section class="card">
             <h2 class="mb-4 text-base font-semibold">Grafik Daya</h2>
@@ -193,14 +199,11 @@
 (function () {
     const URL_DATA = @json(route('historical.chartData')) + window.location.search;
 
-    // Palet grafik: warna berbeda jelas satu sama lain, tetap selaras dengan tema hijau limau
-    const COLORS = {
-        temperature: '#d9730d', // oranye hangat
-        voltage: '#6f9f12',     // hijau limau gelap (tema)
-        current: '#0f766e',     // teal
-        power: '#262a26',       // arang (tema)
-        irradiance: '#b45309',  // kuning tanah
-    };
+    // Node hanya dibedakan warna (urutan sama dengan palet dashboard). Indeks = urutan node global.
+    const NODE_COLORS = ['#6f9f12', '#2563eb', '#ea580c', '#8b5cf6', '#0891b2', '#db2777', '#ca8a04', '#16a34a', '#64748b', '#dc2626'];
+    const colorOf = (i) => NODE_COLORS[i % NODE_COLORS.length];
+
+    const UNITS = { temperature: '°C', voltage: 'V', current: 'A', power: 'W', irradiance: 'W/m²' };
 
     if (window.Chart) {
         Chart.defaults.color = '#6f766f';
@@ -208,60 +211,175 @@
         Chart.defaults.font.family = "'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif";
     }
 
-    const line = (label, data, color) => ({
-        label, data, borderColor: color, backgroundColor: color + '22',
-        borderWidth: 2, pointRadius: 2, pointHoverRadius: 4, tension: 0.3, spanGaps: true,
-    });
+    const num = (v) => v == null ? '—' : v.toLocaleString('id-ID', { maximumFractionDigits: 2 });
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-    const options = (yTitles) => {
-        const scales = {
-            x: { ticks: { maxTicksLimit: 10, autoSkip: true, maxRotation: 0 }, grid: { display: false } },
-            y: { title: { display: true, text: yTitles[0] } },
-        };
-        if (yTitles[1]) scales.y1 = { position: 'right', title: { display: true, text: yTitles[1] }, grid: { drawOnChartArea: false } };
-        return {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            scales, plugins: { legend: { position: 'bottom' } },
-        };
+    // Garis kursor vertikal di titik yang ditunjuk (sama seperti grafik tren dashboard)
+    const cursorLine = {
+        id: 'cursorLine',
+        beforeDatasetsDraw(chart) {
+            const active = chart.tooltip?.getActiveElements();
+            if (!active?.length) return;
+            const { ctx, chartArea: { top, bottom } } = chart;
+            const x = active[0].element.x;
+            ctx.save();
+            ctx.strokeStyle = '#b9c2bd';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x, top);
+            ctx.lineTo(x, bottom);
+            ctx.stroke();
+            ctx.restore();
+        },
     };
 
-    const showEmpty = (id) => {
+    // Tooltip HTML gaya dashboard: satu waktu, lalu semua node dengan nilai tebal
+    const htmlTooltip = (unit, title) => ({ chart, tooltip }) => {
+        const box = chart.canvas.parentElement;
+        let tip = box.querySelector('[data-chart-tip]');
+        if (!tip) {
+            tip = document.createElement('div');
+            tip.dataset.chartTip = '';
+            tip.className = 'pointer-events-none absolute z-10 hidden rounded-xl border border-line bg-white px-3 py-2 text-xs shadow-lg';
+            box.appendChild(tip);
+        }
+        const rows = (tooltip.dataPoints ?? []).filter((p) => p.parsed.y != null);
+        if (tooltip.opacity === 0 || !rows.length) return tip.classList.add('hidden');
+
+        tip.innerHTML = `<p class="text-muted">${esc(title(rows[0].dataIndex))}</p>` + rows.map((p) =>
+            `<p class="mt-0.5 flex items-center gap-1.5 whitespace-nowrap"><span class="h-2 w-2 rounded-full" style="background:${p.dataset.borderColor}"></span>${esc(p.dataset.label)}: <b class="text-ink">${num(p.parsed.y)} ${unit}</b></p>`
+        ).join('');
+        tip.classList.remove('hidden');
+        const left = Math.min(Math.max(tooltip.caretX - tip.offsetWidth / 2, 0), box.clientWidth - tip.offsetWidth);
+        tip.style.left = left + 'px';
+        tip.style.top = chart.chartArea.top + 'px';
+    };
+
+    // Formatter waktu dalam zona dashboard (bukan zona browser).
+    // Bila semua data masih di tanggal yang sama, label sumbu cukup jam saja.
+    const dayKey = (ms, tz) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(ms);
+    const timeFormatter = (tz, granularity, sameDay = false) => {
+        const opts = {
+            minute: sameDay
+                ? { hour: '2-digit', minute: '2-digit', hour12: false }
+                : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false },
+            day: { day: '2-digit', month: '2-digit' },
+            month: { month: 'short', year: 'numeric' },
+        }[granularity] ?? {};
+        const f = new Intl.DateTimeFormat('id-ID', { ...opts, timeZone: tz });
+        const full = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz });
+        return { tick: (ms) => f.format(ms).replace(',', ''), full: (ms) => full.format(ms).replace(',', '') };
+    };
+
+    const showMessage = (id, text, cls = 'text-muted') => {
         const canvas = document.getElementById(id);
-        canvas.parentElement.innerHTML = '<div class="flex h-64 items-center justify-center text-sm text-muted">Belum ada data untuk filter ini.</div>';
+        Chart.getChart(canvas)?.destroy();
+        canvas.classList.add('hidden');
+        let msg = canvas.parentElement.querySelector('[data-chart-msg]');
+        if (!msg) {
+            msg = document.createElement('div');
+            msg.dataset.chartMsg = '';
+            canvas.parentElement.appendChild(msg);
+        }
+        msg.className = 'flex h-64 items-center justify-center text-sm ' + cls;
+        msg.textContent = text;
     };
 
-    // Satu chart per kelompok sensor; yAxis menentukan sumbu untuk tiap seri
-    const build = (id, labels, datasets, sensors, yTitles) => {
-        const picked = datasets.filter((d) => sensors.includes(d.sensor));
-        const hasData = picked.some((d) => d.data.some((v) => v !== null));
-        if (!hasData) return showEmpty(id);
-        new Chart(document.getElementById(id), {
+    // Satu chart = satu sensor, satu garis per node. Sumbu X = 10 slot berjarak sama (satu per
+    // putaran kirim / interval), bukan skala waktu, agar label tetap rapi walau jeda kirim tidak rata.
+    const build = (id, json, sensor) => {
+        const { datasets, meta } = json;
+        // Node yang tidak punya nilai sensor ini (mis. paket parsial) tidak ikut digambar maupun di legenda
+        const picked = datasets.filter((d) => d.sensor === sensor && d.data.some((p) => p.y !== null));
+        if (!picked.length) {
+            return showMessage(id, 'Belum ada data untuk filter ini.');
+        }
+
+        const canvas = document.getElementById(id);
+        canvas.classList.remove('hidden');
+        canvas.parentElement.querySelector('[data-chart-msg]')?.remove();
+        Chart.getChart(canvas)?.destroy();
+
+        const unit = UNITS[sensor];
+        // Semua seri berbagi waktu titik yang sama (meta.ticks), urutan data = urutan slot
+        const times = meta.ticks;
+        const sameDay = dayKey(times[0], meta.timezone) === dayKey(times[times.length - 1], meta.timezone);
+        const fmt = timeFormatter(meta.timezone, meta.granularity, sameDay);
+        // Label berisi tanggal lebih panjang → dibuat miring agar 10 label muat
+        const withDate = meta.granularity !== 'minute' || !sameDay;
+        const isRange = meta.mode === 'range';
+
+        new Chart(canvas, {
             type: 'line',
             data: {
-                labels,
-                datasets: picked.map((d, i) => ({
-                    ...line(d.label, d.data, COLORS[d.sensor] ?? d.borderColor),
-                    yAxisID: i === 0 ? 'y' : 'y1',
-                })),
+                labels: times.map(fmt.tick),
+                datasets: picked.map((d) => {
+                    const color = colorOf(d.style);
+                    return {
+                        label: d.label, data: d.data.map((p) => p.y),
+                        borderColor: color, backgroundColor: color,
+                        pointBackgroundColor: '#fff', pointBorderColor: color,
+                        pointHoverBackgroundColor: color, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2,
+                        borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 5, spanGaps: true,
+                        // Garis melengkung halus; 'monotone' tidak melampaui nilai data di puncak/lembah
+                        cubicInterpolationMode: 'monotone', borderCapStyle: 'round', borderJoinStyle: 'round',
+                    };
+                }),
             },
-            options: options(yTitles),
+            plugins: [cursorLine],
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                // Semua node berbagi waktu titik yang sama (putaran kirim / interval) → satu tooltip untuk semua node
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    x: {
+                        // offset: setengah slot di kiri/kanan agar titik tepi tidak menempel ke sumbu
+                        offset: true,
+                        grid: { display: false },
+                        // Satu label per titik (10 label), sama dengan waktu di tooltip
+                        ticks: { autoSkip: false, minRotation: withDate ? 45 : 0, maxRotation: 45 },
+                    },
+                    y: { title: { display: true, text: unit } },
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 14 },
+                    },
+                    tooltip: {
+                        enabled: false,
+                        external: htmlTooltip(unit, (i) => (isRange ? 's.d. ' : '') + fmt.full(times[i])),
+                    },
+                },
+            },
         });
     };
 
+    // Toggle Tegangan/Arus: satu besaran per tampilan agar panel tidak berisi enam garis
+    const vcButtons = document.querySelectorAll('[data-vc-sensor]');
+    const setVcActive = (sensor) => vcButtons.forEach((b) => {
+        const on = b.dataset.vcSensor === sensor;
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.className = 'rounded-xl px-3 py-1.5 text-sm font-medium transition-colors ' +
+            (on ? 'bg-primary text-white shadow-sm' : 'text-muted hover:text-ink');
+    });
+
     fetch(URL_DATA, { headers: { Accept: 'application/json' } })
-        .then((r) => r.json())
+        .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then((json) => {
-            const { labels, datasets } = json;
-            build('chart-temperature', labels, datasets, ['temperature'], ['°C']);
-            build('chart-voltage-current', labels, datasets, ['voltage', 'current'], ['V', 'A']);
-            build('chart-power', labels, datasets, ['power'], ['W']);
-            build('chart-irradiance', labels, datasets, ['irradiance'], ['W/m²']);
+            build('chart-temperature', json, 'temperature');
+            build('chart-voltage-current', json, 'voltage');
+            build('chart-power', json, 'power');
+            build('chart-irradiance', json, 'irradiance');
+
+            vcButtons.forEach((b) => b.addEventListener('click', () => {
+                setVcActive(b.dataset.vcSensor);
+                build('chart-voltage-current', json, b.dataset.vcSensor);
+            }));
         })
         .catch(() => {
             ['chart-temperature', 'chart-voltage-current', 'chart-power', 'chart-irradiance'].forEach((id) => {
-                const c = document.getElementById(id);
-                c.parentElement.innerHTML = '<div class="flex h-64 items-center justify-center text-sm text-red-600">Gagal memuat data grafik.</div>';
+                showMessage(id, 'Gagal memuat data grafik.', 'text-red-600');
             });
         });
 })();

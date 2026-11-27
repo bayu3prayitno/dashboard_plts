@@ -37,14 +37,16 @@ class HistoricalChartTest extends TestCase
 
         $json = $this->actingAs($user)->getJson(route('historical.chartData'))->assertOk()->json();
 
-        $this->assertCount(2, $json['labels']);
-        $this->assertCount(5, $json['datasets']);
+        $this->assertSame('latest', $json['meta']['mode']);
+        $this->assertCount(5, $json['datasets']); // 5 sensor x 1 node
         $temperature = collect($json['datasets'])->firstWhere('sensor', 'temperature');
-        $this->assertEquals([31.0, 30.0], $temperature['data']);
+        $this->assertSame('Node 01', $temperature['label']);
+        $this->assertEquals([31.0, 30.0], array_column($temperature['data'], 'y'));
 
         $this->actingAs($user)->get(route('historical.index'))
             ->assertOk()
             ->assertSee('chart-temperature', false)
-            ->assertSee('chart-irradiance', false);
+            ->assertSee('chart-irradiance', false)
+            ->assertSee('data-vc-sensor="current"', false);
     }
 }

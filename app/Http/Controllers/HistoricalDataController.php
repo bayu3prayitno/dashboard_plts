@@ -31,14 +31,6 @@ class HistoricalDataController extends Controller
         'irradiance' => 'Irradiance (W/m²)',
     ];
 
-    private const SENSOR_COLORS = [
-        'temperature' => '#ef4444',
-        'voltage' => '#3b82f6',
-        'current' => '#f59e0b',
-        'power' => '#10b981',
-        'irradiance' => '#8b5cf6',
-    ];
-
     /** Kolom ekspor CSV disusun mengikuti format kartu SD Gateway (PRD 5.3). */
     private const CSV_HEADER = [
         'Timestamp',
@@ -57,10 +49,11 @@ class HistoricalDataController extends Controller
 
     private const PER_PAGE = 10;
 
-    /** Maksimal sumber data yang dibaca sebelum dikumulatifkan menjadi grafik. */
-    private const CHART_SOURCE_LIMIT = 10000;
-    /** Maksimal titik grafik setelah data dikumulatifkan. */
+    /** Titik per node: 10 pembacaan terakhir, atau 10 interval bila tanggal difilter. */
     private const CHART_MAX_POINTS = 10;
+
+    /** Batas selisih waktu pembacaan antar node yang masih dianggap satu putaran kirim. */
+    private const ROUND_WINDOW_SECONDS = 300;
 
     public function index(Request $request): View
     {
@@ -132,170 +125,210 @@ class HistoricalDataController extends Controller
     }
 
     /**
-     * Data grafik: rata-rata per waktu rekam (lintas perangkat bila perangkat tidak difilter).
+     * Data grafik: satu seri per node untuk tiap sensor, pada sumbu waktu yang sama.
+     *
+     * - Tanpa filter tanggal: 10 putaran kirim terakhir; pembacaan di putaran yang sama ditaruh
+     *   di waktu yang sama.
+     * Node tanpa data di rentang yang ditampilkan tidak dikirim sebagai seri.
+     * - Dengan filter tanggal: rentang dibagi 10 interval sama panjang; tiap node dirata-rata
+     *   per interval sehingga titik ketiga node sejajar di waktu yang sama.
+     *
+     * Titik dikirim sebagai {x: epoch ms, y: nilai}. `style` adalah posisi node dalam daftar
+     * semua perangkat, sehingga warna & pola garis node tetap sama walau perangkat difilter.
      * Jenis sensor memilih seri yang dikembalikan; kosong berarti semua sensor.
      */
     public function getChartData(Request $request): JsonResponse
     {
         $filters = $this->validatedFilters($request);
-        $query = $this->filteredQuery($filters)
-            ->orderByDesc('recorded_at');
-
-        $withoutDateFilter = $filters['date_from'] === null && $filters['date_to'] === null;
-        if ($withoutDateFilter) {
-            $query->limit(self::CHART_MAX_POINTS);
-        }
-
-        $measurements = $query
-            ->get([
-                'recorded_at',
-                'temperature',
-                'voltage',
-                'current',
-                'power',
-                'irradiance',
-            ])
-            ->reverse()
-            ->values();
-
-        $rows = $filters['date_from'] === null && $filters['date_to'] === null
-            ? $this->latestChartRows($measurements)
-            : $this->aggregateChartRows($measurements, $filters);
-
         $sensorKeys = $filters['sensor_type'] ? [$filters['sensor_type']] : array_keys(self::SENSORS);
 
+        $devices = Device::orderBy('node_id')->orderBy('id')
+            ->get(['id', 'name', 'node_id'])
+            ->values()
+            ->map(fn (Device $d, int $i) => ['id' => $d->id, 'name' => $d->name, 'node_id' => $d->node_id, 'style' => $i])
+            ->filter(fn (array $d) => $filters['device_id'] === null || $d['id'] === $filters['device_id'])
+            ->values();
+
+        $latestMode = $filters['date_from'] === null && $filters['date_to'] === null;
+        [$points, $meta] = $latestMode
+            ? $this->latestChartPoints($devices)
+            : $this->rangeChartPoints($filters);
+
+        $datasets = [];
+        foreach ($sensorKeys as $key) {
+            foreach ($devices as $device) {
+                if (! isset($points[$device['id']])) {
+                    continue; // node tidak mengirim data di rentang ini
+                }
+                $datasets[] = [
+                    'sensor' => $key,
+                    'sensor_label' => self::SENSORS[$key],
+                    'device_id' => $device['id'],
+                    'label' => $device['name'],
+                    'node_id' => $device['node_id'],
+                    'style' => $device['style'],
+                    'data' => array_map(
+                        fn (array $p) => ['x' => $p['x'], 'y' => $p[$key]],
+                        $points[$device['id']] ?? []
+                    ),
+                ];
+            }
+        }
+
         return response()->json([
-            'labels' => $rows->map(fn ($r) => $r->label)->all(),
-            'datasets' => array_map(fn (string $key) => [
-                'label' => self::SENSORS[$key],
-                'sensor' => $key,
-                'data' => $rows->map(fn ($r) => $r->{$key} !== null ? round((float) $r->{$key}, 2) : null)->all(),
-                'borderColor' => self::SENSOR_COLORS[$key],
-            ], $sensorKeys),
-            'meta' => [
-                'points' => $rows->count(),
+            'datasets' => $datasets,
+            'meta' => $meta + [
+                'mode' => $latestMode ? 'latest' : 'range',
+                'timezone' => DashboardController::tz(),
                 'limit' => self::CHART_MAX_POINTS,
             ],
         ]);
     }
 
-    /** Ambil tepat 10 timestamp pengukuran terbaru tanpa mengelompokkan berdasarkan rentang. */
-    private function latestChartRows(Collection $measurements): Collection
+    /**
+     * 10 putaran kirim terakhir (keseluruhan, bukan per node); node yang tidak mengirim di rentang itu
+     * tidak ikut. Node mengirim pada siklus yang sama tetapi selisih beberapa detik, jadi pembacaan
+     * dikelompokkan ke satu putaran agar titik semua node sejajar di waktu yang sama.
+     * Putaran baru dimulai bila node yang sama mengirim lagi, atau selisih dari awal putaran
+     * melebihi ROUND_WINDOW_SECONDS. Waktu putaran = pembacaan paling awal di putaran itu.
+     *
+     * @return array{0: array<int, list<array>>, 1: array}
+     */
+    private function latestChartPoints(Collection $devices): array
     {
-        $timestamps = [];
+        $readings = [];
+        foreach ($devices as $device) {
+            $rows = Measurement::where('device_id', $device['id'])
+                ->orderByDesc('recorded_at')->orderByDesc('id')
+                ->limit(self::CHART_MAX_POINTS)
+                ->get(['device_id', 'recorded_at', ...array_keys(self::SENSORS)]);
+            array_push($readings, ...$rows->all());
+        }
+        usort($readings, fn (Measurement $a, Measurement $b) => $a->recorded_at->getTimestampMs() <=> $b->recorded_at->getTimestampMs());
 
-        foreach ($measurements as $measurement) {
-            $at = $measurement->recorded_at->timezone(DashboardController::tz());
-            $key = $at->format('Y-m-d H:i:s');
-
-            if (! isset($timestamps[$key])) {
-                $timestamps[$key] = [
-                    'recorded_at' => $key,
-                    'label' => $at->format('d/m H:i'),
-                    'sums' => [],
-                    'counts' => [],
-                ];
+        $rounds = [];
+        foreach ($readings as $m) {
+            $ts = $m->recorded_at->getTimestamp();
+            $last = array_key_last($rounds);
+            if ($last === null
+                || isset($rounds[$last]['nodes'][$m->device_id])
+                || $ts - $rounds[$last]['start'] > self::ROUND_WINDOW_SECONDS) {
+                $rounds[] = ['start' => $ts, 'x' => $m->recorded_at->getTimestampMs(), 'nodes' => []];
+                $last = array_key_last($rounds);
             }
+            $rounds[$last]['nodes'][$m->device_id] = $this->sensorValues($m);
+        }
+        $rounds = array_slice($rounds, -self::CHART_MAX_POINTS);
 
-            foreach (array_keys(self::SENSORS) as $sensor) {
-                $value = $measurement->{$sensor};
-                if ($value !== null) {
-                    $timestamps[$key]['sums'][$sensor] = ($timestamps[$key]['sums'][$sensor] ?? 0) + (float) $value;
-                    $timestamps[$key]['counts'][$sensor] = ($timestamps[$key]['counts'][$sensor] ?? 0) + 1;
-                }
-            }
+        // Hanya node yang mengirim di 10 putaran terakhir; node lain tidak ditampilkan
+        $sending = []; // dikunci device_id
+        foreach ($rounds as $round) {
+            $sending += $round['nodes'];
         }
 
-        $rows = [];
-        foreach (array_slice($timestamps, -self::CHART_MAX_POINTS) as $timestamp) {
-            $row = (object) [
-                'recorded_at' => $timestamp['recorded_at'],
-                'label' => $timestamp['label'],
-            ];
-
-            foreach (array_keys(self::SENSORS) as $sensor) {
-                $count = $timestamp['counts'][$sensor] ?? 0;
-                $row->{$sensor} = $count > 0
-                    ? round($timestamp['sums'][$sensor] / $count, 2)
-                    : null;
+        $empty = array_fill_keys(array_keys(self::SENSORS), null);
+        $points = [];
+        foreach ($devices as $device) {
+            if (! isset($sending[$device['id']])) {
+                continue;
             }
-            $rows[] = $row;
+            $points[$device['id']] = array_map(
+                fn (array $round) => ['x' => $round['x']] + ($round['nodes'][$device['id']] ?? $empty),
+                $rounds
+            );
         }
 
-        return collect($rows);
+        return [$points, ['granularity' => 'minute', 'ticks' => array_column($rounds, 'x')]];
     }
 
-    /** Bagi seluruh rentang filter menjadi maksimal 10 interval secara dinamis. */
-    private function aggregateChartRows(Collection $measurements, array $filters): Collection
+    /**
+     * Bagi rentang filter menjadi 10 interval sama panjang, rata-rata per node per interval.
+     * Interval pertama [awal, akhir1], berikutnya (akhir sebelumnya, akhir].
+     *
+     * @return array{0: array<int, list<array>>, 1: array}
+     */
+    private function rangeChartPoints(array $filters): array
     {
-        if ($measurements->isEmpty()) {
-            return collect();
+        $query = $this->filteredQuery($filters);
+        $range = (clone $query)->toBase()
+            ->selectRaw('MIN(recorded_at) as first_at, MAX(recorded_at) as last_at')
+            ->first();
+
+        if ($range->first_at === null) {
+            return [[], ['granularity' => 'minute', 'ticks' => []]];
         }
 
-        $tz = DashboardController::tz();
-        $firstMeasurement = $measurements->first()->recorded_at->timezone($tz);
-        $lastMeasurement = $measurements->last()->recorded_at->timezone($tz);
+        $first = $this->fromUtc($range->first_at);
+        $last = $this->fromUtc($range->last_at);
 
         $start = $filters['date_from'] !== null
             ? $this->localFilterTime($filters['date_from'])
-            : $firstMeasurement->startOfDay();
+            : $first->startOfDay();
 
         $end = $filters['date_to'] !== null
             ? $this->localFilterTime($filters['date_to'], true)
-            : ($filters['date_from'] !== null ? $lastMeasurement : $lastMeasurement->endOfDay());
+            : ($filters['date_from'] !== null ? $last : $last->endOfDay());
 
         $spanSeconds = max(1, $start->diffInSeconds($end));
         $intervalSeconds = max(1, (int) ceil($spanSeconds / self::CHART_MAX_POINTS));
 
-        $rows = [];
-        $previousEnd = $start;
-        for ($index = 0; $index < self::CHART_MAX_POINTS; $index++) {
-            $bucketEnd = $index === self::CHART_MAX_POINTS - 1
-                ? $end
-                : $start->addSeconds(($index + 1) * $intervalSeconds);
+        $bucketEnds = [];
+        for ($i = 0; $i < self::CHART_MAX_POINTS; $i++) {
+            $bucketEnd = $i === self::CHART_MAX_POINTS - 1 ? $end : $start->addSeconds(($i + 1) * $intervalSeconds);
+            $bucketEnds[] = $bucketEnd->min($end)->getTimestampMs();
+        }
 
-            $interval = $measurements->filter(function ($measurement) use ($index, $start, $previousEnd, $bucketEnd, $tz) {
-                $at = $measurement->recorded_at->timezone($tz);
-
-                if ($index === 0) {
-                    return $at->gte($start) && $at->lte($bucketEnd);
-                }
-
-                return $at->gt($previousEnd) && $at->lte($bucketEnd);
-            });
-
-            $row = (object) [
-                'recorded_at' => $bucketEnd->format('Y-m-d H:i:s'),
-                'label' => $this->chartBucketLabel($bucketEnd, $intervalSeconds),
-            ];
+        // Akumulasi per node per interval tanpa memuat semua baris sekaligus
+        $sums = [];
+        $counts = [];
+        $startTs = $start->getTimestamp();
+        $rows = (clone $query)->select(['id', 'device_id', 'recorded_at', ...array_keys(self::SENSORS)])->lazyById(1000);
+        foreach ($rows as $m) {
+            $diff = $m->recorded_at->getTimestamp() - $startTs;
+            $bucket = $diff <= 0 ? 0 : min(self::CHART_MAX_POINTS - 1, (int) ceil($diff / $intervalSeconds) - 1);
 
             foreach (array_keys(self::SENSORS) as $sensor) {
-                $values = $interval
-                    ->pluck($sensor)
-                    ->filter(fn ($value) => $value !== null)
-                    ->map(fn ($value) => (float) $value);
-
-                $row->{$sensor} = $values->isNotEmpty()
-                    ? round($values->avg(), 2)
-                    : null;
+                if ($m->{$sensor} !== null) {
+                    $sums[$m->device_id][$bucket][$sensor] = ($sums[$m->device_id][$bucket][$sensor] ?? 0) + (float) $m->{$sensor};
+                    $counts[$m->device_id][$bucket][$sensor] = ($counts[$m->device_id][$bucket][$sensor] ?? 0) + 1;
+                }
             }
-            $rows[] = $row;
-            $previousEnd = $bucketEnd;
         }
 
-        return collect($rows);
+        $points = [];
+        foreach (array_keys($counts) as $deviceId) {
+            foreach ($bucketEnds as $bucket => $x) {
+                $point = ['x' => $x];
+                foreach (array_keys(self::SENSORS) as $sensor) {
+                    $n = $counts[$deviceId][$bucket][$sensor] ?? 0;
+                    $point[$sensor] = $n > 0 ? round($sums[$deviceId][$bucket][$sensor] / $n, 2) : null;
+                }
+                $points[$deviceId][] = $point;
+            }
+        }
+
+        return [$points, ['granularity' => $this->chartGranularity($intervalSeconds), 'ticks' => $bucketEnds]];
     }
 
-    private function chartBucketLabel(CarbonImmutable $at, int $intervalSeconds): string
+    /** @return array<string, ?float> nilai tiap sensor, dibulatkan 2 desimal */
+    private function sensorValues(Measurement $m): array
     {
-        if ($intervalSeconds < 24 * 3600) {
-            return $at->format('d/m H:i');
-        }
-        if ($intervalSeconds <= 30 * 86400) {
-            return $at->format('d/m');
+        $values = [];
+        foreach (array_keys(self::SENSORS) as $sensor) {
+            $values[$sensor] = $m->{$sensor} !== null ? round((float) $m->{$sensor}, 2) : null;
         }
 
-        return $at->translatedFormat('M Y');
+        return $values;
+    }
+
+    /** Ketelitian label sumbu waktu sesuai lebar interval. */
+    private function chartGranularity(int $intervalSeconds): string
+    {
+        if ($intervalSeconds < 24 * 3600) {
+            return 'minute';
+        }
+
+        return $intervalSeconds <= 30 * 86400 ? 'day' : 'month';
     }
 
     /** @return array{device_id: ?int, sensor_type: ?string, date_from: ?string, date_to: ?string} */

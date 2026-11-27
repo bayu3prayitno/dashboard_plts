@@ -157,11 +157,102 @@ class HistoricalDataTest extends TestCase
             ->getJson(route('historical.chartData', ['sensor_type' => 'temperature']))
             ->assertOk();
 
-        $response->assertJsonCount(1, 'datasets');
+        // satu seri per node untuk sensor yang dipilih, tidak dirata-rata lintas node
+        $response->assertJsonCount(2, 'datasets');
         $response->assertJsonPath('datasets.0.sensor', 'temperature');
-        // dua perangkat pada waktu yang sama dirata-rata menjadi satu titik
-        $response->assertJsonPath('datasets.0.data.0', 29.5);
-        $response->assertJsonPath('labels.0', '14/11 10:00');
+        $response->assertJsonPath('datasets.0.label', 'Node Sensor 01');
+        $response->assertJsonPath('datasets.0.data.0.y', 28.5);
+        $response->assertJsonPath('datasets.1.label', 'Node Sensor 02');
+        $response->assertJsonPath('datasets.1.data.0.y', 30.5);
+        // kedua node di sumbu waktu yang sama (epoch ms)
+        $x = strtotime('2026-11-14 03:00:00 UTC') * 1000;
+        $response->assertJsonPath('datasets.0.data.0.x', $x);
+        $response->assertJsonPath('datasets.1.data.0.x', $x);
+    }
+
+    public function test_latest_chart_aligns_nodes_sending_seconds_apart_in_same_round(): void
+    {
+        // Siklus 1: node A 10:00:00, node B 10:00:07 → satu putaran
+        $this->measurement($this->deviceA, 1, '2026-11-14 03:00:00', temp: 28);
+        $this->measurement($this->deviceB, 1, '2026-11-14 03:00:07', temp: 31);
+        // Siklus 2 (30 menit kemudian): node B duluan, A menyusul 12 detik
+        $this->measurement($this->deviceB, 2, '2026-11-14 03:30:03', temp: 32);
+        $this->measurement($this->deviceA, 2, '2026-11-14 03:30:15', temp: 29);
+
+        $json = $this->actingAs($this->user)
+            ->getJson(route('historical.chartData', ['sensor_type' => 'temperature']))
+            ->assertOk()
+            ->json();
+
+        [$a, $b] = $json['datasets'];
+        $round1 = strtotime('2026-11-14 03:00:00 UTC') * 1000;
+        $round2 = strtotime('2026-11-14 03:30:03 UTC') * 1000;
+
+        $this->assertSame([$round1, $round2], $json['meta']['ticks']);
+        $this->assertSame([$round1, $round2], array_column($a['data'], 'x'));
+        $this->assertSame([$round1, $round2], array_column($b['data'], 'x'));
+        $this->assertEquals([28.0, 29.0], array_column($a['data'], 'y'));
+        $this->assertEquals([31.0, 32.0], array_column($b['data'], 'y'));
+    }
+
+    public function test_latest_chart_shows_only_last_ten_rounds_and_hides_nodes_not_sending(): void
+    {
+        // Node B berhenti lebih dulu; node A masih mengirim 10 putaran sesudahnya
+        for ($i = 0; $i < 10; $i++) {
+            $this->measurement($this->deviceB, $i + 1, sprintf('2026-11-14 01:%02d:00', $i * 5), temp: 30 + $i);
+            $this->measurement($this->deviceA, $i + 1, sprintf('2026-11-14 03:%02d:00', $i * 5), temp: 20 + $i);
+        }
+
+        $json = $this->actingAs($this->user)
+            ->getJson(route('historical.chartData', ['sensor_type' => 'temperature']))
+            ->assertOk()
+            ->json();
+
+        // 10 data terakhir semuanya dari node A → node B tidak ditampilkan
+        $this->assertCount(10, $json['meta']['ticks']);
+        $this->assertCount(1, $json['datasets']);
+        $this->assertSame($this->deviceA->id, $json['datasets'][0]['device_id']);
+        $this->assertCount(10, $json['datasets'][0]['data']);
+    }
+
+    public function test_chart_data_with_date_range_aligns_nodes_on_same_intervals(): void
+    {
+        // 10:00 & 10:30 WIB → interval pertama dan kedua dari rentang 10:00–15:00 (10 x 30 menit)
+        $this->measurement($this->deviceA, 1, '2026-11-14 03:00:00', temp: 20);
+        $this->measurement($this->deviceA, 2, '2026-11-14 03:10:00', temp: 22);
+        $this->measurement($this->deviceB, 1, '2026-11-14 03:40:00', temp: 30);
+
+        $json = $this->actingAs($this->user)
+            ->getJson(route('historical.chartData', [
+                'sensor_type' => 'temperature',
+                'date_from' => '2026-11-14T10:00',
+                'date_to' => '2026-11-14T15:00',
+            ]))
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('range', $json['meta']['mode']);
+        $this->assertCount(10, $json['meta']['ticks']);
+        [$a, $b] = $json['datasets'];
+
+        $this->assertSame(array_column($a['data'], 'x'), array_column($b['data'], 'x'));
+        $this->assertSame($json['meta']['ticks'], array_column($a['data'], 'x'));
+        $this->assertEquals([21.0, null], array_slice(array_column($a['data'], 'y'), 0, 2));
+        $this->assertEquals([null, 30.0], array_slice(array_column($b['data'], 'y'), 0, 2));
+    }
+
+    public function test_chart_style_index_stays_the_same_when_filtered_by_device(): void
+    {
+        $this->measurement($this->deviceB, 1, '2026-11-14 03:00:00');
+
+        $all = $this->actingAs($this->user)->getJson(route('historical.chartData', ['sensor_type' => 'power']))->json();
+        $one = $this->actingAs($this->user)->getJson(route('historical.chartData', [
+            'sensor_type' => 'power', 'device_id' => $this->deviceB->id,
+        ]))->json();
+
+        $this->assertSame(1, collect($all['datasets'])->firstWhere('device_id', $this->deviceB->id)['style']);
+        $this->assertCount(1, $one['datasets']);
+        $this->assertSame(1, $one['datasets'][0]['style']);
     }
 
     public function test_filter_endpoint_returns_json_rows(): void
