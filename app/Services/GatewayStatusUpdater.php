@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * Status internet gateway. Firmware tidak mengirim status internet, jadi status dihitung dari
  * kedatangan pesan: bila pesan dari gateway sampai ke server lewat broker, koneksi internet
- * gateway berfungsi pada saat itu. Lihat Gateway::internetStatus untuk batas waktunya.
+ * gateway berfungsi pada saat itu (gateways.is_connected = true). Lihat ConnectionStatus untuk timeout-nya.
  */
 class GatewayStatusUpdater
 {
@@ -22,8 +22,8 @@ class GatewayStatusUpdater
             return false;
         }
 
-        // Cukup waktu pesan terakhir; status connected/disconnected dihitung saat dibaca
-        Gateway::where('gateway_code', $gatewayCode)->update(['internet_last_seen_at' => now()]);
+        // Kembali false lewat status:refresh bila tidak ada pesan melewati Offline Timeout
+        Gateway::where('gateway_code', $gatewayCode)->update(['internet_last_seen_at' => now(), 'is_connected' => true]);
 
         return true;
     }

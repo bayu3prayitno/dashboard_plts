@@ -38,8 +38,10 @@ class DataReset
                 $deleted['measurements'] = DB::table('measurements')->delete();
 
                 // Tanpa data, "terakhir terlihat" lama membuat node/gateway tampil online palsu
-                DB::table('devices')->update(['last_seen_at' => null]);
+                DB::table('devices')->update(['last_seen_at' => null, 'is_online' => false]);
                 DB::table('gateways')->update([
+                    'is_online' => false,
+                    'is_connected' => false,
                     'last_seen_at' => null,
                     'internet_last_seen_at' => null,
                 ]);

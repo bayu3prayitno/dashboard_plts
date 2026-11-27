@@ -20,12 +20,14 @@ class DummyDataSeeder extends Seeder
         $gateway = Gateway::firstOrCreate(
             ['name' => 'Gateway Demo PLTS'],
             [
+                'is_online' => true,
+                'is_connected' => true,
                 'internet_last_seen_at' => $now,
                 'last_seen_at' => $now,
             ],
         );
 
-        $gateway->update(['last_seen_at' => $now, 'internet_last_seen_at' => $now]);
+        $gateway->update(['is_online' => true, 'is_connected' => true, 'last_seen_at' => $now, 'internet_last_seen_at' => $now]);
 
         $nodeDefinitions = [
             1 => ['name' => 'Node Panel 01', 'location' => 'Blok A - String 1', 'offset' => 0.0],
@@ -38,6 +40,7 @@ class DummyDataSeeder extends Seeder
                     'name' => $definition['name'],
                     'location' => $definition['location'],
                     'is_active' => true,
+                    'is_online' => true,
                     'last_seen_at' => $now,
                 ],
             );

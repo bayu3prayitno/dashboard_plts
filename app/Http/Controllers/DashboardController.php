@@ -63,7 +63,7 @@ class DashboardController extends Controller
 
         $latest = $this->latestMeasurements();
         $devices = $this->gatewayDevices($selected['id'])
-            ->map(fn (Device $device) => $this->deviceRow($device, $latest->get($device->id), $offlineMinutes))
+            ->map(fn (Device $device) => $this->deviceRow($device, $latest->get($device->id)))
             ->all();
 
         $online = array_values(array_filter($devices, fn ($d) => $d['status'] === Device::STATUS_ONLINE));
@@ -118,7 +118,7 @@ class DashboardController extends Controller
     }
 
     /** Satu baris perangkat untuk tabel dan daftar di dashboard. */
-    private function deviceRow(Device $device, ?object $m, int $offlineMinutes): array
+    private function deviceRow(Device $device, ?object $m): array
     {
         $latest = [];
         foreach (array_keys(self::SENSORS) as $key) {
@@ -132,7 +132,7 @@ class DashboardController extends Controller
             'nama' => $device->name,
             'lokasi' => $device->location,
             'aktif' => $device->is_active,
-            'status' => $device->status($offlineMinutes),
+            'status' => $device->status(),
             'last_seen' => $device->last_seen_at,
             'packet_loss' => $packetLoss,
             'received' => $packetLoss !== null ? max(0, 100 - $packetLoss) : null,
@@ -430,11 +430,10 @@ class DashboardController extends Controller
     /** API untuk polling: return data dashboard terbaru (devices, status, measurements). */
     public function liveData(Request $request): \Illuminate\Http\JsonResponse
     {
-        $offlineMinutes = Device::offlineTimeoutMinutes();
         $gateway = $this->selectedGateway($request, $this->gatewayRows());
         $latest = $this->latestMeasurements();
         $devices = $this->gatewayDevices($gateway['id'])
-            ->map(fn (Device $device) => $this->deviceRow($device, $latest->get($device->id), $offlineMinutes))
+            ->map(fn (Device $device) => $this->deviceRow($device, $latest->get($device->id)))
             ->all();
 
         $online = array_values(array_filter($devices, fn ($d) => $d['status'] === Device::STATUS_ONLINE));

@@ -10,3 +10,7 @@ Artisan::command('inspire', function () {
 
 // Deteksi perangkat offline (PRD 4.4). Butuh scheduler: `php artisan schedule:work` atau cron `schedule:run`.
 Schedule::command('alerts:check-offline')->everyMinute();
+
+// Status online node, gateway, dan MQTT disimpan sebagai boolean; dihitung ulang tiap 5 detik
+// (selaras interval heartbeat MQTT) agar perubahan ke offline/terputus hampir seketika.
+Schedule::command('status:refresh')->everyFiveSeconds()->withoutOverlapping();

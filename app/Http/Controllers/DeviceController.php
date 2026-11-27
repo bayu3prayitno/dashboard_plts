@@ -195,16 +195,15 @@ class DeviceController extends Controller
     /** API untuk polling: return status device terbaru (online/offline/inactive). */
     public function liveStatus(): JsonResponse
     {
-        $offlineMinutes = Device::offlineTimeoutMinutes();
         $devices = Device::query()
             ->orderBy('node_id')
-            ->get(['id', 'node_id', 'name', 'is_active', 'last_seen_at'])
-            ->map(function (Device $device) use ($offlineMinutes) {
+            ->get(['id', 'node_id', 'name', 'is_active', 'is_online', 'last_seen_at'])
+            ->map(function (Device $device) {
                 return [
                     'id' => $device->id,
                     'node_id' => $device->node_id,
                     'name' => $device->name,
-                    'status' => $device->status($offlineMinutes),
+                    'status' => $device->status(),
                     'last_seen' => $device->last_seen_at?->toIso8601String(),
                 ];
             })

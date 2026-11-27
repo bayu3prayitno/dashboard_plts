@@ -117,9 +117,9 @@ class TelemetryIngestor
                 }
             }
 
-            // Status online/offline dan MQTT dihitung saat dibaca (lihat Gateway), hanya waktu terakhir yang disimpan
-            $device->update(['last_seen_at' => $now]);
-            $gateway->update(['last_seen_at' => $now]);
+            // Data masuk = node & gateway online. Kembali false lewat status:refresh bila melewati timeout.
+            $device->update(['last_seen_at' => $now, 'is_online' => true]);
+            $gateway->update(['last_seen_at' => $now, 'is_online' => true]);
 
             $this->alerts->resolveOffline($device, $now);
             if (! $existing) {

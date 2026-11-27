@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['gateway_id', 'node_id', 'name', 'location', 'is_active', 'last_seen_at'])]
+#[Fillable(['gateway_id', 'node_id', 'name', 'location', 'is_active', 'is_online', 'last_seen_at'])]
 class Device extends Model
 {
     public const STATUS_ONLINE = 'online';
@@ -29,6 +29,7 @@ class Device extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_online' => 'boolean',
             'last_seen_at' => 'datetime',
         ];
     }
@@ -42,22 +43,16 @@ class Device extends Model
     }
 
     /**
-     * Status untuk tampilan: nonaktif, online, atau offline (dihitung dari last_seen_at).
-     * Kirim $offlineMinutes bila sudah dibaca, agar tidak query settings berulang.
+     * Status untuk tampilan dari kolom boolean: nonaktif (is_active), lalu online/offline (is_online).
+     * is_online diset true saat data masuk dan false oleh `status:refresh` bila melewati Offline Timeout.
      */
-    public function status(?int $offlineMinutes = null): string
+    public function status(): string
     {
         if (! $this->is_active) {
             return self::STATUS_INACTIVE;
         }
 
-        $offlineMinutes ??= self::offlineTimeoutMinutes();
-
-        if ($this->last_seen_at === null || $this->last_seen_at->lt(now()->subMinutes($offlineMinutes))) {
-            return self::STATUS_OFFLINE;
-        }
-
-        return self::STATUS_ONLINE;
+        return $this->is_online ? self::STATUS_ONLINE : self::STATUS_OFFLINE;
     }
 
     public function gateway(): BelongsTo

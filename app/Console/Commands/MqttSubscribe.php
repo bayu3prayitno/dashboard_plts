@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Gateway;
+use App\Services\ConnectionStatus;
 use App\Services\GatewayStatusUpdater;
 use App\Services\LegacyGatewayPayloadAdapter;
 use App\Services\MqttSettings;
@@ -37,8 +38,11 @@ class MqttSubscribe extends Command
     /** Jeda reconnect (detik): naik bertahap sampai batas ini selama broker/DB belum bisa dihubungi. */
     private const RETRY_MAX_DELAY = 30;
 
-    public function handle(TelemetryIngestor $ingestor, LegacyGatewayPayloadAdapter $adapter, GatewayStatusUpdater $statusUpdater): int
+    private ?ConnectionStatus $connectionStatus = null;
+
+    public function handle(TelemetryIngestor $ingestor, LegacyGatewayPayloadAdapter $adapter, GatewayStatusUpdater $statusUpdater, ConnectionStatus $connectionStatus): int
     {
+        $this->connectionStatus = $connectionStatus;
         $codeVersion = $this->codeVersion();
         $delay = 2;
 
@@ -81,6 +85,8 @@ class MqttSubscribe extends Command
                     // Heartbeat hanya ditulis selama loop benar-benar berjalan (= masih terhubung)
                     if (microtime(true) - $lastHeartbeat >= self::HEARTBEAT_INTERVAL) {
                         $this->safeCache(fn () => Cache::put(Gateway::MQTT_HEARTBEAT_KEY, time(), now()->addMinutes(10)));
+                        // gateways.is_mqtt_connected = true (hanya baris yang belum, mis. gateway baru)
+                        $this->safeDb(fn () => $connectionStatus->setMqttConnected(true));
                         $lastHeartbeat = microtime(true);
                     }
 
@@ -129,6 +135,7 @@ class MqttSubscribe extends Command
     private function closeQuietly(?MqttClient $client): void
     {
         $this->safeCache(fn () => Cache::forget(Gateway::MQTT_HEARTBEAT_KEY));
+        $this->safeDb(fn () => $this->connectionStatus?->setMqttConnected(false));
 
         try {
             if ($client?->isConnected()) {
@@ -146,6 +153,16 @@ class MqttSubscribe extends Command
             $fn();
         } catch (Throwable $e) {
             Log::warning('MQTT: gagal menulis cache', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /** Menulis status ke database tidak boleh menjatuhkan subscriber (mis. saat DB mati). */
+    private function safeDb(callable $fn): void
+    {
+        try {
+            $fn();
+        } catch (Throwable $e) {
+            Log::warning('MQTT: gagal menyimpan status MQTT', ['error' => $e->getMessage()]);
         }
     }
 

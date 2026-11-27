@@ -10,10 +10,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * `status`, `mqtt_status`, dan `internet_status` bukan kolom tabel: semuanya dihitung setiap kali
- * dibaca (lihat accessor di bawah) dari waktu terakhir yang tersimpan, sehingga tidak pernah basi.
+ * Status disimpan sebagai boolean:
+ * - is_online         : paket data valid dalam Offline Timeout (dari last_seen_at)
+ * - is_connected      : pesan apa pun dari gateway dalam Offline Timeout (dari internet_last_seen_at)
+ * - is_mqtt_connected : subscriber server terhubung ke broker (heartbeat ≤ 30 detik)
+ * Diperbarui saat data/pesan masuk dan tiap 5 detik oleh `status:refresh` (App\Services\ConnectionStatus).
+ * `status`, `internet_status`, dan `mqtt_status` hanyalah label teks dari kolom itu untuk tampilan/API.
  */
-#[Fillable(['name', 'last_seen_at', 'internet_last_seen_at'])]
+#[Fillable(['name', 'is_online', 'is_connected', 'is_mqtt_connected', 'last_seen_at', 'internet_last_seen_at'])]
 class Gateway extends Model
 {
     /**
@@ -32,7 +36,7 @@ class Gateway extends Model
     /** Subscriber dianggap terputus bila heartbeat lebih tua dari detik ini. */
     public const MQTT_HEARTBEAT_TIMEOUT = 30;
 
-    /** Subscriber MQTT sedang terhubung ke broker (dihitung dari heartbeat, bukan dari database). */
+    /** Heartbeat subscriber masih baru. Dipakai status:refresh untuk mengisi is_mqtt_connected. */
     public static function subscriberConnected(): bool
     {
         $at = Cache::get(self::MQTT_HEARTBEAT_KEY);
@@ -40,42 +44,22 @@ class Gateway extends Model
         return $at !== null && (time() - (int) $at) <= self::MQTT_HEARTBEAT_TIMEOUT;
     }
 
-    /**
-     * Status MQTT untuk tampilan, dihitung setiap kali dibaca.
-     * Terhubung hanya jika subscriber sedang terhubung ke broker.
-     */
+    /** Label MQTT dari kolom is_mqtt_connected. */
     protected function mqttStatus(): Attribute
     {
-        return Attribute::get(fn () => self::subscriberConnected() ? 'connected' : 'disconnected');
+        return Attribute::get(fn () => $this->is_mqtt_connected ? 'connected' : 'disconnected');
     }
 
-    /**
-     * Status koneksi dihitung dari paket terakhir (node mana pun) yang diterima server dari gateway ini.
-     * Terhubung bila paket terakhir masih dalam Offline Timeout.
-     */
+    /** Label koneksi gateway dari kolom is_connected. */
     protected function internetStatus(): Attribute
     {
-        return Attribute::get(fn () => $this->internet_last_seen_at !== null
-            && $this->internet_last_seen_at->gte(now()->subMinutes(self::connectionTimeoutMinutes()))
-                ? 'connected'
-                : 'disconnected');
+        return Attribute::get(fn () => $this->is_connected ? 'connected' : 'disconnected');
     }
 
-    /**
-     * Status gateway untuk tampilan, dihitung dari waktu data terakhir.
-     * Online jika data masuk dalam batas waktu offline (pengaturan), selain itu offline.
-     */
+    /** Label online/offline gateway dari kolom is_online. */
     protected function status(): Attribute
     {
-        return Attribute::get(function () {
-            if ($this->last_seen_at === null) {
-                return 'offline';
-            }
-
-            $recent = $this->last_seen_at->gte(now()->subMinutes(Device::offlineTimeoutMinutes()));
-
-            return $recent ? 'online' : 'offline';
-        });
+        return Attribute::get(fn () => $this->is_online ? 'online' : 'offline');
     }
 
     protected static function booted(): void
@@ -85,6 +69,10 @@ class Gateway extends Model
             do {
                 $gateway->gateway_code = sprintf('GW-%05x', random_int(0, 0xFFFFF));
             } while (self::where('gateway_code', $gateway->gateway_code)->exists());
+
+            // Status MQTT milik subscriber (berlaku untuk semua gateway): gateway baru langsung ikut,
+            // tanpa menunggu heartbeat berikutnya.
+            $gateway->is_mqtt_connected ??= self::subscriberConnected();
         });
     }
 
@@ -96,6 +84,9 @@ class Gateway extends Model
     protected function casts(): array
     {
         return [
+            'is_online' => 'boolean',
+            'is_connected' => 'boolean',
+            'is_mqtt_connected' => 'boolean',
             'last_seen_at' => 'datetime',
             'internet_last_seen_at' => 'datetime',
         ];
