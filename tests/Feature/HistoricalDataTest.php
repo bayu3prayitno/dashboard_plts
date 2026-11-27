@@ -255,6 +255,78 @@ class HistoricalDataTest extends TestCase
         $this->assertSame(1, $one['datasets'][0]['style']);
     }
 
+    private function secondGatewayDevice(): Device
+    {
+        $gateway = Gateway::create([
+            'name' => 'Gateway Kedua',
+            'status' => 'offline',
+            'mqtt_status' => 'disconnected',
+            'internet_status' => 'disconnected',
+        ]);
+
+        return Device::create([
+            'gateway_id' => $gateway->id, 'node_id' => 1, 'name' => 'Node Gateway Kedua', 'location' => 'Lokasi C', 'is_active' => true,
+        ]);
+    }
+
+    public function test_default_shows_only_first_gateway(): void
+    {
+        $other = $this->secondGatewayDevice();
+        $this->measurement($this->deviceA, 1, '2026-11-14 03:00:00');
+        $this->measurement($other, 2, '2026-11-14 03:00:00');
+
+        $this->actingAs($this->user)->get(route('historical.index'))
+            ->assertOk()
+            ->assertViewHas('filters', fn (array $f) => $f['gateway_id'] === $this->deviceA->gateway_id)
+            ->assertViewHas('data', fn (array $rows) => count($rows) === 1 && $rows[0]['packet_number'] === 1);
+
+        $chart = $this->actingAs($this->user)->getJson(route('historical.chartData', ['sensor_type' => 'power']))->json();
+        $this->assertSame([$this->deviceA->id], array_column($chart['datasets'], 'device_id'));
+
+        $csv = $this->actingAs($this->user)->get(route('historical.exportCsv'))->streamedContent();
+        $this->assertStringNotContainsString('Node Gateway Kedua', $csv);
+    }
+
+    public function test_gateway_filter_selects_other_gateway(): void
+    {
+        $other = $this->secondGatewayDevice();
+        $this->measurement($this->deviceA, 1, '2026-11-14 03:00:00');
+        $this->measurement($other, 2, '2026-11-14 03:00:00');
+
+        $this->actingAs($this->user)
+            ->get(route('historical.index', ['gateway_id' => $other->gateway_id]))
+            ->assertOk()
+            ->assertViewHas('data', fn (array $rows) => count($rows) === 1 && $rows[0]['packet_number'] === 2);
+
+        // Style dihitung per gateway: node pertama gateway kedua tetap warna pertama
+        $chart = $this->actingAs($this->user)
+            ->getJson(route('historical.chartData', ['sensor_type' => 'power', 'gateway_id' => $other->gateway_id]))
+            ->json();
+        $this->assertSame([$other->id], array_column($chart['datasets'], 'device_id'));
+        $this->assertSame(0, $chart['datasets'][0]['style']);
+    }
+
+    public function test_device_from_other_gateway_is_rejected(): void
+    {
+        $other = $this->secondGatewayDevice();
+
+        $this->actingAs($this->user)
+            ->get(route('historical.index', ['gateway_id' => $this->deviceA->gateway_id, 'device_id' => $other->id]))
+            ->assertSessionHasErrors('device_id');
+    }
+
+    public function test_device_filter_without_gateway_uses_device_gateway(): void
+    {
+        $other = $this->secondGatewayDevice();
+        $this->measurement($other, 2, '2026-11-14 03:00:00');
+
+        $this->actingAs($this->user)
+            ->get(route('historical.index', ['device_id' => $other->id]))
+            ->assertOk()
+            ->assertViewHas('filters', fn (array $f) => $f['gateway_id'] === $other->gateway_id)
+            ->assertViewHas('data', fn (array $rows) => count($rows) === 1);
+    }
+
     public function test_filter_endpoint_returns_json_rows(): void
     {
         $this->measurement($this->deviceA, 1, '2026-11-14 03:00:00');

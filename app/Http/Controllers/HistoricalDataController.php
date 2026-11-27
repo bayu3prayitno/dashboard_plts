@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Device;
+use App\Models\Gateway;
 use App\Models\Measurement;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -11,15 +12,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Data historis & laporan (PRD 4.3).
  *
- * Filter (perangkat, jenis sensor, rentang tanggal) dibaca dari query string sehingga
- * bisa dibagikan lewat URL dan dipakai ulang oleh ekspor CSV dan data grafik.
- * Tanggal filter diartikan dalam zona waktu dashboard (WIB).
+ * - Tabel: 10 baris per halaman, filter gateway/perangkat/sensor/tanggal, urut waktu turun.
  */
 class HistoricalDataController extends Controller
 {
@@ -62,6 +62,7 @@ class HistoricalDataController extends Controller
         $page = $this->paginateRows($query);
 
         return view('dashboard.historical.index', [
+            'gateways' => $this->gatewayOptions(),
             'devices' => $this->deviceOptions(),
             'sensors' => self::SENSORS,
             'data' => $page->getCollection()->map(fn (Measurement $m) => $this->toRow($m))->all(),
@@ -127,22 +128,14 @@ class HistoricalDataController extends Controller
     /**
      * Data grafik: satu seri per node untuk tiap sensor, pada sumbu waktu yang sama.
      *
-     * - Tanpa filter tanggal: 10 putaran kirim terakhir; pembacaan di putaran yang sama ditaruh
-     *   di waktu yang sama.
-     * Node tanpa data di rentang yang ditampilkan tidak dikirim sebagai seri.
-     * - Dengan filter tanggal: rentang dibagi 10 interval sama panjang; tiap node dirata-rata
-     *   per interval sehingga titik ketiga node sejajar di waktu yang sama.
-     *
-     * Titik dikirim sebagai {x: epoch ms, y: nilai}. `style` adalah posisi node dalam daftar
-     * semua perangkat, sehingga warna & pola garis node tetap sama walau perangkat difilter.
-     * Jenis sensor memilih seri yang dikembalikan; kosong berarti semua sensor.
+     * Hanya node yang mengirim data di rentang filter yang ditampilkan. Bila tidak ada filter tanggal,
      */
     public function getChartData(Request $request): JsonResponse
     {
         $filters = $this->validatedFilters($request);
         $sensorKeys = $filters['sensor_type'] ? [$filters['sensor_type']] : array_keys(self::SENSORS);
 
-        $devices = Device::orderBy('node_id')->orderBy('id')
+        $devices = Device::where('gateway_id', $filters['gateway_id'])->orderBy('node_id')->orderBy('id')
             ->get(['id', 'name', 'node_id'])
             ->values()
             ->map(fn (Device $d, int $i) => ['id' => $d->id, 'name' => $d->name, 'node_id' => $d->node_id, 'style' => $i])
@@ -331,18 +324,36 @@ class HistoricalDataController extends Controller
         return $intervalSeconds <= 30 * 86400 ? 'day' : 'month';
     }
 
-    /** @return array{device_id: ?int, sensor_type: ?string, date_from: ?string, date_to: ?string} */
+    /**
+     * gateway_id selalu terisi bila ada gateway: dari query, dari gateway perangkat yang dipilih,
+     * atau gateway pertama. Perangkat harus milik gateway terpilih.
+     *
+     * @return array{gateway_id: ?int, device_id: ?int, sensor_type: ?string, date_from: ?string, date_to: ?string}
+     */
     private function validatedFilters(Request $request): array
     {
         $validated = $request->validate([
+            'gateway_id' => ['nullable', 'integer', 'exists:gateways,id'],
             'device_id' => ['nullable', 'integer', 'exists:devices,id'],
             'sensor_type' => ['nullable', 'string', Rule::in(array_keys(self::SENSORS))],
             'date_from' => ['nullable', 'regex:/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/'],
             'date_to' => ['nullable', 'regex:/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/', 'after_or_equal:date_from'],
         ]);
 
+        $deviceId = isset($validated['device_id']) ? (int) $validated['device_id'] : null;
+        $deviceGatewayId = $deviceId !== null ? Device::whereKey($deviceId)->value('gateway_id') : null;
+
+        $gatewayId = isset($validated['gateway_id'])
+            ? (int) $validated['gateway_id']
+            : ($deviceGatewayId ?? Gateway::query()->oldest('id')->value('id'));
+
+        if ($deviceId !== null && (int) $deviceGatewayId !== $gatewayId) {
+            throw ValidationException::withMessages(['device_id' => 'Perangkat tidak termasuk gateway yang dipilih.']);
+        }
+
         return [
-            'device_id' => isset($validated['device_id']) ? (int) $validated['device_id'] : null,
+            'gateway_id' => $gatewayId,
+            'device_id' => $deviceId,
             'sensor_type' => $validated['sensor_type'] ?? null,
             'date_from' => $validated['date_from'] ?? null,
             'date_to' => $validated['date_to'] ?? null,
@@ -353,6 +364,10 @@ class HistoricalDataController extends Controller
     private function filteredQuery(array $filters): Builder
     {
         $query = Measurement::query();
+
+        if ($filters['gateway_id'] !== null) {
+            $query->whereIn('device_id', Device::select('id')->where('gateway_id', $filters['gateway_id']));
+        }
 
         if ($filters['device_id'] !== null) {
             $query->where('device_id', $filters['device_id']);
@@ -394,12 +409,21 @@ class HistoricalDataController extends Controller
         ];
     }
 
-    /** @return array<int, array{id: int, name: string}> */
+    /** Urutan sama dengan dashboard: gateway pertama = id terkecil. @return array<int, array{id: int, name: string}> */
+    private function gatewayOptions(): array
+    {
+        return Gateway::query()->oldest('id')
+            ->get(['id', 'name'])
+            ->map(fn (Gateway $g) => ['id' => $g->id, 'name' => $g->name])
+            ->all();
+    }
+
+    /** Semua perangkat; dropdown di view disaring sesuai gateway terpilih. @return array<int, array{id: int, name: string, gateway_id: int}> */
     private function deviceOptions(): array
     {
         return Device::orderBy('node_id')
-            ->get(['id', 'name'])
-            ->map(fn (Device $d) => ['id' => $d->id, 'name' => $d->name])
+            ->get(['id', 'name', 'gateway_id'])
+            ->map(fn (Device $d) => ['id' => $d->id, 'name' => $d->name, 'gateway_id' => (int) $d->gateway_id])
             ->all();
     }
 

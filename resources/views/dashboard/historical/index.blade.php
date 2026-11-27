@@ -7,12 +7,23 @@
 @section('content')
 <div class="space-y-4">
     <!-- Toolbar: filter (corong) + export -->
+    @php
+        $selectedGateway = collect($gateways)->firstWhere('id', $filters['gateway_id']);
+        $filterActive = $filters['gateway_id'] !== ($gateways[0]['id'] ?? null)
+            || $filters['device_id'] !== null || $filters['date_from'] !== null || $filters['date_to'] !== null;
+    @endphp
     <div class="flex items-center justify-end gap-2">
+        @if($selectedGateway)
+            <span class="mr-auto inline-flex items-center gap-2 text-sm text-muted">
+                <x-icon name="server" :size="16" />
+                <span class="font-medium text-ink">{{ $selectedGateway['name'] }}</span>
+            </span>
+        @endif
         <button type="button" onclick="openFilterModal()" title="Filter" aria-label="Filter"
                 class="btn btn-outline relative bg-white/60 px-3">
             <x-icon name="filter" :size="16" />
             Filter
-            @if(($filters['device_id'] ?? '') !== '' || ($filters['date_from'] ?? '') !== '' || ($filters['date_to'] ?? '') !== '')
+            @if($filterActive)
                 <span class="absolute -top-1 -right-1 size-2.5 rounded-full bg-lime ring-2 ring-canvas" aria-hidden="true"></span>
             @endif
         </button>
@@ -37,15 +48,27 @@
             </div>
 
             <form method="GET" action="{{ route('historical.index') }}" class="space-y-5">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <!-- Device Filter -->
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <!-- Gateway Filter: default gateway pertama, tidak ada opsi "semua" -->
+                    <div class="min-w-0">
+                        <label for="gateway_id" class="mb-1.5 block text-xs font-medium text-muted">Gateway</label>
+                        <select id="gateway_id" name="gateway_id"
+                                class="w-full truncate rounded-full border border-line bg-white px-4 py-2.5 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
+                            @foreach($gateways as $gateway)
+                                <option value="{{ $gateway['id'] }}" @selected($filters['gateway_id'] === $gateway['id'])>{{ $gateway['name'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <!-- Device Filter: hanya perangkat milik gateway terpilih -->
                     <div class="min-w-0">
                         <label for="device_id" class="mb-1.5 block text-xs font-medium text-muted">Perangkat</label>
                         <select id="device_id" name="device_id"
                                 class="w-full truncate rounded-full border border-line bg-white px-4 py-2.5 text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
                             <option value="">Semua Perangkat</option>
                             @foreach($devices as $device)
-                                <option value="{{ $device['id'] }}" @selected((string) $filters['device_id'] === (string) $device['id'])>{{ $device['name'] }}</option>
+                                @continue($device['gateway_id'] !== $filters['gateway_id'])
+                                <option value="{{ $device['id'] }}" @selected($filters['device_id'] === $device['id'])>{{ $device['name'] }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -187,6 +210,19 @@
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') closeFilterModal();
     });
+
+    // Ganti gateway → isi ulang dropdown perangkat dengan node milik gateway itu, kembali ke "Semua Perangkat"
+    (function () {
+        const DEVICES = @json($devices);
+        const gatewaySelect = document.getElementById('gateway_id');
+        const deviceSelect = document.getElementById('device_id');
+        gatewaySelect?.addEventListener('change', function () {
+            deviceSelect.length = 1; // sisakan "Semua Perangkat"
+            DEVICES.filter((d) => String(d.gateway_id) === gatewaySelect.value)
+                .forEach((d) => deviceSelect.add(new Option(d.name, d.id)));
+            deviceSelect.value = '';
+        });
+    })();
     @if($errors->any())
         document.addEventListener('DOMContentLoaded', openFilterModal);
     @endif
