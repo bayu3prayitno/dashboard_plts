@@ -8,19 +8,6 @@
 <form method="POST" action="{{ route('alerts.configuration.update') }}" class="space-y-6">
     @csrf
 
-    <!-- Global Settings -->
-    <div class="card">
-        <h3 class="text-lg font-semibold text-ink mb-4">Pengaturan Global</h3>
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-semibold text-ink mb-2">Offline Timeout (Menit)</label>
-                <input type="number" name="offline_timeout" value="{{ old('offline_timeout', $offlineTimeout) }}" min="5" max="1440" class="w-full md:w-64 px-4 py-2 rounded-full border border-line bg-white outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary" required>
-                <p class="text-xs text-muted mt-1">Durasi sebelum perangkat dianggap offline (minimal 10-15 menit untuk toleransi 2-3 siklus pengiriman)</p>
-                @error('offline_timeout')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
-            </div>
-        </div>
-    </div>
-
     <!-- Threshold Settings -->
     <div class="card">
         <h3 class="text-lg font-semibold text-ink mb-4">Ambang Batas Parameter Sensor</h3>
