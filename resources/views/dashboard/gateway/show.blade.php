@@ -20,21 +20,16 @@
     </div>
 
     {{-- Status --}}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <section class="card">
-            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="router" :size="16" /> Gateway</div>
-            <div class="mt-3"><x-status-badge :status="$gateway->status" /></div>
-            <p class="mt-2 text-xs break-all text-muted">{{ $gateway->gateway_code }}</p>
-        </section>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <section class="card">
             <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="server" :size="16" /> Broker MQTT</div>
             <div class="mt-3"><x-status-badge :status="$gateway->mqtt_status" /></div>
             <p class="mt-2 text-xs text-muted">Koneksi subscriber server ke broker</p>
         </section>
         <section class="card">
-            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="globe" :size="16" /> Koneksi Server</div>
+            <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="globe" :size="16" /> Koneksi Gateway</div>
             <div class="mt-3"><x-status-badge :status="$gateway->internet_status" /></div>
-            <p class="mt-2 text-xs text-muted">Ada paket dari node mana pun dalam {{ \App\Models\Gateway::connectionTimeoutMinutes() }} menit terakhir (Offline Timeout)</p>
+            <p class="mt-2 text-xs text-muted">Ada paket dari node dalam {{ \App\Models\Gateway::connectionTimeoutMinutes() }} menit terakhir (Offline Timeout)</p>
         </section>
         <section class="card">
             <div class="flex items-center gap-2 text-sm text-muted"><x-icon name="clock" :size="16" /> Komunikasi terakhir</div>
