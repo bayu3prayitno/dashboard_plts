@@ -21,7 +21,7 @@ class LegacyGatewayPayloadAdapterTest extends TestCase
         parent::setUp();
 
         $this->gateway = Gateway::create([
-            'name' => 'Gateway Test', 'status' => 'offline', 'mqtt_status' => 'disconnected', 'internet_status' => 'disconnected',
+            'name' => 'Gateway Test',
         ]);
         Device::create([
             'gateway_id' => $this->gateway->id, 'node_id' => 1, 'name' => 'Node 01', 'location' => 'A', 'is_active' => true,

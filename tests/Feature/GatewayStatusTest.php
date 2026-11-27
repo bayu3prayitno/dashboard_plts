@@ -7,7 +7,6 @@ use App\Models\Setting;
 use App\Services\GatewayStatusUpdater;
 use App\Support\SettingsCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 class GatewayStatusTest extends TestCase
@@ -17,7 +16,7 @@ class GatewayStatusTest extends TestCase
     private function makeGateway(): Gateway
     {
         return Gateway::create([
-            'name' => 'Gateway Test', 'status' => 'offline', 'mqtt_status' => 'disconnected', 'internet_status' => 'disconnected',
+            'name' => 'Gateway Test',
         ]);
     }
 
@@ -55,13 +54,19 @@ class GatewayStatusTest extends TestCase
         app(GatewayStatusUpdater::class)->markInternetConnected($gateway->gateway_code);
         $gateway->update(['internet_last_seen_at' => now()->subMinutes(Gateway::connectionTimeoutMinutes() + 1)]);
 
-        // Tampilan langsung benar walau perintah terjadwal belum berjalan
+        // Dihitung saat dibaca: langsung terputus tanpa menunggu job terjadwal
         $this->assertSame('disconnected', $gateway->fresh()->internet_status);
-        $this->assertSame('connected', $gateway->fresh()->getRawOriginal('internet_status'));
+    }
 
-        Artisan::call('gateways:check-internet');
+    public function test_status_columns_are_not_stored(): void
+    {
+        $gateway = $this->makeGateway();
 
-        $this->assertSame('disconnected', $gateway->fresh()->getRawOriginal('internet_status'));
+        $this->assertArrayNotHasKey('status', $gateway->fresh()->getAttributes());
+        $this->assertArrayNotHasKey('mqtt_status', $gateway->fresh()->getAttributes());
+        $this->assertArrayNotHasKey('internet_status', $gateway->fresh()->getAttributes());
+        $this->assertSame('offline', $gateway->status);
+        $this->assertSame('disconnected', $gateway->internet_status);
     }
 
     public function test_connection_timeout_follows_offline_timeout_setting(): void
@@ -85,7 +90,7 @@ class GatewayStatusTest extends TestCase
         $gateway = $this->makeGateway();
         app(GatewayStatusUpdater::class)->markInternetConnected($gateway->gateway_code);
         $gateway->update(['internet_last_seen_at' => now()->subHour()]);
-        Artisan::call('gateways:check-internet');
+        $this->assertSame('disconnected', $gateway->fresh()->internet_status);
 
         app(GatewayStatusUpdater::class)->markInternetConnected($gateway->gateway_code);
 

@@ -35,12 +35,7 @@ class GatewayApiController extends Controller
             'name' => ['required', 'string', 'max:255'],
         ]);
 
-        // Status awal dan kode gateway dibuat oleh sistem
-        $data += [
-            'status' => 'offline',
-            'mqtt_status' => 'disconnected',
-            'internet_status' => 'disconnected',
-        ];
+        // Kode gateway dibuat oleh sistem; status koneksi dihitung dari waktu pesan terakhir
 
         $gateway = Gateway::create($data);
         ActivityLog::record($request->user()?->id, 'gateway.created', $gateway, null, $gateway->getAttributes());

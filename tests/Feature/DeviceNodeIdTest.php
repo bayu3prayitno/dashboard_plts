@@ -24,7 +24,7 @@ class DeviceNodeIdTest extends TestCase
     private function makeGateway(string $name): Gateway
     {
         return Gateway::create([
-            'name' => $name, 'status' => 'offline', 'mqtt_status' => 'disconnected', 'internet_status' => 'disconnected',
+            'name' => $name,
         ]);
     }
 

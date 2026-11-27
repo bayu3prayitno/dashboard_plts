@@ -171,7 +171,7 @@ class SettingsTest extends TestCase
 
     public function test_audit_log_shows_real_activity_with_details(): void
     {
-        $gateway = Gateway::create(['name' => 'Gateway Test', 'status' => 'offline', 'mqtt_status' => 'disconnected', 'internet_status' => 'disconnected']);
+        $gateway = Gateway::create(['name' => 'Gateway Test']);
         $device = Device::create([
             'gateway_id' => $gateway->id, 'node_id' => 1, 'name' => 'Node Sensor 01', 'location' => 'Lokasi A', 'is_active' => true,
         ]);

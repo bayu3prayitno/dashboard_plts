@@ -9,7 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
-#[Fillable(['name', 'status', 'mqtt_status', 'internet_status', 'last_seen_at', 'internet_last_seen_at'])]
+/**
+ * `status`, `mqtt_status`, dan `internet_status` bukan kolom tabel: semuanya dihitung setiap kali
+ * dibaca (lihat accessor di bawah) dari waktu terakhir yang tersimpan, sehingga tidak pernah basi.
+ */
+#[Fillable(['name', 'last_seen_at', 'internet_last_seen_at'])]
 class Gateway extends Model
 {
     /**
@@ -51,15 +55,10 @@ class Gateway extends Model
      */
     protected function internetStatus(): Attribute
     {
-        return Attribute::get(function (?string $value) {
-            if ($value !== 'connected' || $this->internet_last_seen_at === null) {
-                return 'disconnected';
-            }
-
-            return $this->internet_last_seen_at->gte(now()->subMinutes(self::connectionTimeoutMinutes()))
+        return Attribute::get(fn () => $this->internet_last_seen_at !== null
+            && $this->internet_last_seen_at->gte(now()->subMinutes(self::connectionTimeoutMinutes()))
                 ? 'connected'
-                : 'disconnected';
-        });
+                : 'disconnected');
     }
 
     /**

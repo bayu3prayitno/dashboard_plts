@@ -40,8 +40,6 @@ class DataReset
                 // Tanpa data, "terakhir terlihat" lama membuat node/gateway tampil online palsu
                 DB::table('devices')->update(['last_seen_at' => null]);
                 DB::table('gateways')->update([
-                    'status' => 'offline',
-                    'internet_status' => 'disconnected',
                     'last_seen_at' => null,
                     'internet_last_seen_at' => null,
                 ]);

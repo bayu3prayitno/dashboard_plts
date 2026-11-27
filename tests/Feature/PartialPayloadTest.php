@@ -19,7 +19,7 @@ class PartialPayloadTest extends TestCase
     public function test_partial_packet_is_stored_with_null_fields_and_brings_device_online(): void
     {
         $gateway = Gateway::create([
-            'name' => 'Gateway Test', 'status' => 'offline', 'mqtt_status' => 'disconnected', 'internet_status' => 'disconnected',
+            'name' => 'Gateway Test',
         ]);
         $device = Device::create([
             'gateway_id' => $gateway->id, 'node_id' => 1, 'name' => 'Node 01', 'location' => 'A', 'is_active' => true,
@@ -43,7 +43,7 @@ class PartialPayloadTest extends TestCase
     public function test_packet_gap_is_logged(): void
     {
         $gateway = Gateway::create([
-            'name' => 'Gateway Test', 'status' => 'offline', 'mqtt_status' => 'disconnected', 'internet_status' => 'disconnected',
+            'name' => 'Gateway Test',
         ]);
         Device::create([
             'gateway_id' => $gateway->id, 'node_id' => 1, 'name' => 'Node 01', 'location' => 'A', 'is_active' => true,

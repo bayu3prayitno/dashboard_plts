@@ -18,7 +18,7 @@ class DeviceTrendTest extends TestCase
     {
         $user = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $gateway = Gateway::create([
-            'name' => 'Gateway Test', 'status' => 'online', 'mqtt_status' => 'connected', 'internet_status' => 'connected',
+            'name' => 'Gateway Test',
         ]);
         $device = Device::create([
             'gateway_id' => $gateway->id, 'node_id' => 1, 'name' => 'Node 01', 'location' => 'A', 'is_active' => true,

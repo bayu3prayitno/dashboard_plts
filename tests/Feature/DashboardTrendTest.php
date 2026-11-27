@@ -24,7 +24,7 @@ class DashboardTrendTest extends TestCase
 
         $user = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $gateway = Gateway::create([
-            'name' => 'Gateway Test', 'status' => 'online', 'mqtt_status' => 'connected', 'internet_status' => 'connected',
+            'name' => 'Gateway Test',
         ]);
         $a = Device::create(['gateway_id' => $gateway->id, 'node_id' => 1, 'name' => 'Node A', 'location' => 'X', 'is_active' => true]);
         $b = Device::create(['gateway_id' => $gateway->id, 'node_id' => 2, 'name' => 'Node B', 'location' => 'X', 'is_active' => true]);

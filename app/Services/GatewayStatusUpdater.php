@@ -22,10 +22,8 @@ class GatewayStatusUpdater
             return false;
         }
 
-        Gateway::where('gateway_code', $gatewayCode)->update([
-            'internet_status' => 'connected',
-            'internet_last_seen_at' => now(),
-        ]);
+        // Cukup waktu pesan terakhir; status connected/disconnected dihitung saat dibaca
+        Gateway::where('gateway_code', $gatewayCode)->update(['internet_last_seen_at' => now()]);
 
         return true;
     }

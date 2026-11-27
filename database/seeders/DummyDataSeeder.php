@@ -20,14 +20,12 @@ class DummyDataSeeder extends Seeder
         $gateway = Gateway::firstOrCreate(
             ['name' => 'Gateway Demo PLTS'],
             [
-                'status' => 'online',
-                'mqtt_status' => 'connected',
-                'internet_status' => 'connected',
+                'internet_last_seen_at' => $now,
                 'last_seen_at' => $now,
             ],
         );
 
-        $gateway->update(['last_seen_at' => $now]);
+        $gateway->update(['last_seen_at' => $now, 'internet_last_seen_at' => $now]);
 
         $nodeDefinitions = [
             1 => ['name' => 'Node Panel 01', 'location' => 'Blok A - String 1', 'offset' => 0.0],

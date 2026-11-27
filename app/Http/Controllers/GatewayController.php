@@ -47,13 +47,6 @@ class GatewayController extends Controller
             'name' => ['required', 'string', 'max:255'],
         ]);
 
-        // Status koneksi diperbarui oleh sistem (MQTT subscriber), bukan oleh pengguna
-        $data += [
-            'status' => 'offline',
-            'mqtt_status' => 'disconnected',
-            'internet_status' => 'disconnected',
-        ];
-
         $gateway = Gateway::create($data);
         ActivityLog::record($request->user()?->id, 'gateway.created', $gateway, null, $gateway->getAttributes());
 

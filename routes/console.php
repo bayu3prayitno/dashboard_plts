@@ -10,6 +10,3 @@ Artisan::command('inspire', function () {
 
 // Deteksi perangkat offline (PRD 4.4). Butuh scheduler: `php artisan schedule:work` atau cron `schedule:run`.
 Schedule::command('alerts:check-offline')->everyMinute();
-
-// Status internet gateway terputus bila status MQTT tidak diterima dalam 10 menit.
-Schedule::command('gateways:check-internet')->everyMinute();

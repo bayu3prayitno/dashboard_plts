@@ -27,9 +27,6 @@ class HistoricalDataTest extends TestCase
 
         $gateway = Gateway::create([
             'name' => 'Gateway Test',
-            'status' => 'offline',
-            'mqtt_status' => 'disconnected',
-            'internet_status' => 'disconnected',
         ]);
         $this->deviceA = Device::create([
             'gateway_id' => $gateway->id, 'node_id' => 1, 'name' => 'Node Sensor 01', 'location' => 'Lokasi A', 'is_active' => true,
@@ -259,9 +256,6 @@ class HistoricalDataTest extends TestCase
     {
         $gateway = Gateway::create([
             'name' => 'Gateway Kedua',
-            'status' => 'offline',
-            'mqtt_status' => 'disconnected',
-            'internet_status' => 'disconnected',
         ]);
 
         return Device::create([

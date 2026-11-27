@@ -19,14 +19,7 @@ class GatewaySeeder extends Seeder
 
         foreach ($gateways as $gateway) {
             // Tidak membuat duplikat jika seeder dijalankan ulang
-            Gateway::firstOrCreate(
-                ['name' => $gateway['name']],
-                [
-                    'status' => 'offline',
-                    'mqtt_status' => 'disconnected',
-                    'internet_status' => 'disconnected',
-                ],
-            );
+            Gateway::firstOrCreate(['name' => $gateway['name']]);
         }
     }
 }

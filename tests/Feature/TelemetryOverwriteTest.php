@@ -16,7 +16,7 @@ class TelemetryOverwriteTest extends TestCase
     public function test_duplicate_packet_overwrites_existing_measurement(): void
     {
         $gateway = Gateway::create([
-            'name' => 'Gateway Test', 'status' => 'offline', 'mqtt_status' => 'disconnected', 'internet_status' => 'disconnected',
+            'name' => 'Gateway Test',
         ]);
         $device = Device::create([
             'gateway_id' => $gateway->id, 'node_id' => 1, 'name' => 'Node 01', 'location' => 'A', 'is_active' => true,
